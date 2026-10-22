@@ -2,7 +2,7 @@
 
 DF_AI is at the concept and research stage. Useful contributions include feasibility checks, reviews of existing projects, small reproducible experiments, and corrections to the design documents.
 
-Start in [developer discussions](https://github.com/BentWorks/DF_AI/discussions) for architecture alternatives, integration choices, or proposed experiments. Use issues for a concrete problem or scoped task, and pull requests for reviewable changes. For a substantial implementation, describe the experiment and success criteria before building it.
+Start in [developer discussions](https://github.com/BentWorks/DF_AI/discussions/1) for architecture alternatives, integration choices, or proposed experiments. Use issues for a concrete problem or scoped task, and pull requests for reviewable changes. For a substantial implementation, describe the experiment and success criteria before building it.
 
 ## Make findings reproducible
 

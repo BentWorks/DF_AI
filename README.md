@@ -51,6 +51,6 @@ These are research references, not claims of current compatibility with this pro
 - [Original concept](CONCEPT.md): initial proposal and illustrative code.
 - [Evaluation and plan](EVALUATION.md): analysis, candidate approaches, and assumptions to test.
 - [Contributing](CONTRIBUTING.md): how to propose experiments and report findings.
-- [Developer discussions](https://github.com/BentWorks/DF_AI/discussions): feasibility, architecture alternatives, and results.
+- [Feasibility and approaches discussion](https://github.com/BentWorks/DF_AI/discussions/1): feasibility, architecture alternatives, and results.
 
 The older design documents contain unvalidated claims and estimates. Treat them as starting points for investigation; this README describes the project's current status.
