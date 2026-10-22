@@ -50,6 +50,7 @@ These are research references, not claims of current compatibility with this pro
 
 - [Original concept](CONCEPT.md): initial proposal and illustrative code.
 - [Evaluation and plan](EVALUATION.md): analysis, candidate approaches, and assumptions to test.
+- [Design record](docs/README.md): decision log, open questions, proposals and research, with explicit statuses.
 - [Contributing](CONTRIBUTING.md): how to propose experiments and report findings.
 - [Feasibility and approaches discussion](https://github.com/BentWorks/DF_AI/discussions/1): feasibility, architecture alternatives, and results.
 
