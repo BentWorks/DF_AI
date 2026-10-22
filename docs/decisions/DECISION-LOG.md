@@ -1,7 +1,7 @@
 # Decision log
 
 Statuses and evidence labels are defined in [docs/README.md](../README.md).
-As of 2026-10-22, **nothing here is Accepted.** No maintainer approval has been
+As of 2026-10-22, **nothing here is Accepted.** The current consolidated proposal is [R2](../proposals/R2.md), which both AI collaborators have agreed. No maintainer approval has been
 given, and no gameplay test has been run.
 
 | ID | Decision | Status | Source |
@@ -11,13 +11,15 @@ given, and no gameplay test has been run.
 | DEC-003 | **One writer.** During a run, agents talk only to the controller. The controller alone calls downstream write tools and the step operation. It wraps dfhack-mcp's actuators so their preview, apply and readback safety is kept. | AI-agreed | Codex response, Claude R1 review |
 | DEC-004 | **Execution and goals are tracked separately.** An action record has `execution_status`, optional observed work completion, and a separate `goal_status`, each with evidence, tick and uncertainty. `blocked` is recoverable. `unknown` is a real state after a disconnect, and it is reconciled before any retry. Records are keyed to save and session identity. | AI-agreed | Claude D2 contract, Codex refinement |
 | DEC-005 | **Time control.** Steps are serialized and bounded. Each step records requested and actual ticks, pause state, stop evidence and a wall-clock watchdog. Pause cause may be `unknown` or have multiple contributors. | AI-agreed | Claude D2 time contract, Codex refinement |
-| DEC-006 | **v1 success boundary.** A fixed-profile path covers launch, world setup and embark, then reaches G1, first winter. A separate fixture must prove real fortress-loss detection and termination. A lifecycle feasibility gate is added; see Q-01. | Under review (R1 plus Claude amendment A2) | [R1](../proposals/R1.md) |
+| DEC-006 | **v1 success boundary.** A fixed-profile path covers launch, world setup and embark, then reaches G1, first winter. A separate fixture must prove real fortress-loss detection and termination. A lifecycle feasibility gate is added; see Q-01. | AI-agreed (R2). An assisted embark does not satisfy it without an explicit scope revision. | [R2](../proposals/R2.md) |
 | DEC-007 | The G0–G4 ladder is a scenario progression. Each scenario fixes start date, supplies, difficulty, visibility, reflexes and budgets. Reserves must hold over a sustained interval with a trend. G3 needs a fixture that actually triggers a hostile event. | AI-agreed | Claude ladder, Codex refinement |
 | DEC-008 | **Spatial planning.** Code validates terrain, reachability, materials and layout. The model chooses among candidates and blueprint phases. Freeform layouts get the same validation and preview. Runs record visibility policy and blueprint assistance. | AI-agreed | Claude, Codex R1 |
 | DEC-009 | **Endings.** The terminal states are `objective_achieved`, `fortress_lost`, `budget_exhausted`, `user_stopped` and `infrastructure_failure`. DF's own loss state is the primary evidence. Citizen count is a diagnostic. | AI-agreed | Codex D3, Claude reply |
 | DEC-010 | **Validation order.** Pin a version pair and assess reuse. Then G0, then prepared-save brewing, then two harnesses on an unchanged controller, then full startup plus G1 and the loss fixture, then G2–G4. | AI-agreed | Codex D5 and R1, Claude step 0 |
-| DEC-011 | **Goal/loss precedence.** A goal counts as achieved only once its full sustained interval completes with the fortress alive. Loss evidence at or before that tick makes the outcome `fortress_lost`. | Proposed (Claude amendment A1) | [R1 review](../proposals/R1.md#claude-review) |
-| DEC-012 | The minimum G1 tool catalogue is the list in [R1 review A3](../proposals/R1.md#a3-minimum-g1-tool-catalogue). | Proposed (Claude amendment A3) | [R1 review](../proposals/R1.md#claude-review) |
+| DEC-011 | **Goal/loss precedence.** A goal succeeds only when its whole predicate is verified with the fort alive. Verified loss at or before the goal-completion tick wins, judged by simulation time. An unrecoverable disconnect is reported as `infrastructure_failure` with outcome uncertainty. | AI-agreed (R2 A1) | [R2](../proposals/R2.md) |
+| DEC-012 | The minimum v1 operation contract is the R1 A3 list plus reload and verify-loaded-session. Each operation documents its arguments, preconditions, effects, evidence and failure behavior. Coverage is confirmed against a pinned upstream revision. | AI-agreed (R2 A3) | [R2](../proposals/R2.md) |
+| DEC-013 | **Budgets.** Each scenario declares limits on model calls, input and output tokens, wall time, game ticks and recovery, plus retry accounting. G1 numbers are calibrated after G0, then frozen. | AI-agreed (R2 A4) | [R2](../proposals/R2.md) |
+| DEC-014 | **Consensus process.** Consensus means the maintainer explicitly accepts a specific proposal revision, both AI collaborators agree, and no human reviewer who has commented holds an unresolved material objection. | Proposed (Claude, non-blocking) | [Claude R2 review](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19133921) |
 
 ## Disagreements
 
