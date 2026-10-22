@@ -19,7 +19,7 @@ given, and no gameplay test has been run.
 | DEC-011 | **Goal/loss precedence.** A goal succeeds only when its whole predicate is verified with the fort alive. Verified loss at or before the goal-completion tick wins, judged by simulation time. An unrecoverable disconnect is reported as `infrastructure_failure` with outcome uncertainty. | AI-agreed (R2 A1) | [R2](../proposals/R2.md) |
 | DEC-012 | The minimum v1 operation contract is the R1 A3 list plus reload and verify-loaded-session. Each operation documents its arguments, preconditions, effects, evidence and failure behavior. Coverage is confirmed against a pinned upstream revision. | AI-agreed (R2 A3) | [R2](../proposals/R2.md) |
 | DEC-013 | **Budgets.** Each scenario declares limits on model calls, input and output tokens, wall time, game ticks and recovery, plus retry accounting. G1 numbers are calibrated after G0, then frozen. | AI-agreed (R2 A4) | [R2](../proposals/R2.md) |
-| DEC-014 | **Consensus process.** Consensus means the maintainer explicitly accepts a specific proposal revision, both AI collaborators agree, and no human reviewer who has commented holds an unresolved material objection. | Proposed (Claude, non-blocking) | [Claude R2 review](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19133921) |
+| DEC-014 | **Consensus process.** Record the maintainer's explicit approval of the linked proposal revision. Record each participating reviewer's explicit agreement, or an explicitly acknowledged resolution of their material objections. Missing replies are not agreement. Record who actually reviewed. Agreement confined to AI collaborators is not community consensus. If the maintainer concludes without wider review, label the result a **maintainer decision** and state the review limitation. Material new objections reopen the affected decision. | AI-agreed (wording by Codex) | [Codex clarification](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19133921), Claude acceptance |
 
 ## Disagreements
 
@@ -31,6 +31,7 @@ Earlier differences were resolved by refinement:
 
 ## What consensus requires
 
-Consensus requires an explicit **Accepted** from the maintainer on a consolidated
-proposal, plus agreement from the participating reviewers. When that happens,
-this log is updated, and the conclusion is posted in the discussion.
+DEC-014 defines it. A conclusion links the actual approvals, and it names who
+reviewed. If only the maintainer and the AI collaborators reviewed, the result is
+labeled a **maintainer decision**, not community consensus. Architecture agreement
+is always kept separate from demonstrated gameplay feasibility.

@@ -3,6 +3,12 @@
 Newest entries are first. Each entry names who changed what, and links the
 pull request or commit.
 
+## 2026-10-22 (third entry): AI Collaborator Claude
+
+- DEC-014 was replaced with Codex's clarified wording and moved to AI-agreed. Missing replies are not agreement, and a conclusion without wider review is labeled a maintainer decision.
+- Rewrote "What consensus requires" in the decision log to match.
+- Part of [PR #2](https://github.com/BentWorks/DF_AI/pull/2).
+
 ## 2026-10-22 (second entry): AI Collaborator Claude
 
 - Added `proposals/R2.md`, summarizing Codex's R2. R1 is marked Superseded.
