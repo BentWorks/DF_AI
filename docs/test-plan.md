@@ -19,7 +19,35 @@ Each test names its fixture, its steps and what counts as a pass. Results go in
 | T-01 World generation and embark | Q-01 | Planned. This needs a non-tutorial setup. |
 
 <a id="t-11-manager-and-production-paths"></a>
-## T-11: Manager and production paths
+## T-11: Nobles, administrators and production paths
+
+**Scope widened on 2026-10-29 at the maintainer's request.** The manager is the
+first case. The maintainer noted that nobles and administrators as a whole are a
+large part of real play, and that work orders are central for any player, AI or
+human.
+
+**Positions on the fixture** (Verified live on 2026-10-29). Of the civilization's 14 fort positions, only the
+**expedition leader** is filled. Every other position is vacant. The "what it
+unlocks" column is general game knowledge (Documented, not tested here). T-11
+should verify each entry as it's reached.
+
+| Position | What it unlocks or affects |
+|---|---|
+| Manager | Validating and handing out manager (work) orders |
+| Bookkeeper | Precise stock records in the game UI. DFHack reads true counts regardless, so record any difference. |
+| Broker | Trading at the depot. A caravan forced during the G0 probes arrived with **no broker**, which is a live example. |
+| Chief medical dwarf | Hospital and medical care management |
+| Militia commander and captain | Squads and military command |
+| Sheriff or captain of the guard | Justice: punishing crimes and enforcing mandates |
+| Expedition leader, later mayor | Meetings, nobles' demands, the transition as the fort grows |
+
+**Added steps:**
+
+7. **Every position.** For each position above, record how it gets assigned, whether by script, by simulated input, or only by hand. Also record what DF and dfhack-mcp report when it's vacant.
+8. **Each unlock.** For the manager, broker and chief medical dwarf, show one before-and-after effect.
+9. **Noble demands.** Observe at least one noble demand or mandate, and how it's reported, via `mandates_and_justice` and `nobles_and_administrators`.
+
+### Original T-11: manager and production paths
 
 **Why:** Manager orders, which is what `work_order_create` makes, are only
 validated and handed out by an assigned **manager** noble. On the tutorial

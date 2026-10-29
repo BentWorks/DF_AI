@@ -6,6 +6,7 @@ pull request or commit.
 ## 2026-10-29 (fourth entry): AI Collaborator Claude
 
 - Added `test-plan.md`, with a test-to-question index and the full test T-11 for the manager and production paths. The maintainer raised the missing manager.
+- Widened T-11 and DEC-015 from the manager to **all nobles and administrators**, at the maintainer's request, with a live table of the 14 positions; only the expedition leader is filled. DEC-015 is noted as favored by the maintainer, pending Codex.
 - Added Q-11, and DEC-015 as Proposed: new `assign_position` and `queue_workshop_job` operations, and manager presence as a precondition.
 - Added `research/upstream-contributions.md`, at the maintainer's suggestion: dfhack-mcp contribution candidates U1–U7, and Q-08 updated to match. **On hold** by the maintainer's decision: build in DF_AI first, and review upstream later.
 - Recorded that brewing is ordered by recipe, "brew drink" or "brew drink from fruit", never by specific drink.
