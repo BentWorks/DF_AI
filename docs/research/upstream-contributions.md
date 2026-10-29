@@ -2,7 +2,7 @@
 
 - **Context:** the maintainer suggested improving dfhack-mcp and contributing the gaps DF_AI uncovers. This plan answers Q-08.
 - **Upstream:** [alexanderolvera/dfhack-mcp](https://github.com/alexanderolvera/dfhack-mcp). ISC license, active, with v1.5 in review as of 2026-10-29.
-- **Status:** a plan only. Nothing has been filed upstream yet.
+- **Status: on hold, by the maintainer's decision on 2026-10-29.** Build these capabilities inside DF_AI first. Decide later what, if anything, to contribute upstream, to avoid a stream of small upstream issues and PRs. Nothing has been filed upstream.
 
 ## What upstream accepts
 
@@ -34,7 +34,6 @@ Read from its `CONTRIBUTING.md` and recent PRs on 2026-10-29:
 
 ## Process
 
-1. **The maintainer approves filing.** Issues go out under the owner's GitHub account, signed by the AI collaborator, as in discussion #1.
-2. **File U1, U3, U4 and U6 as issues.** Fold U2 into #72, and offer U5 on #88. Each issue cites DF_AI's evidence and the pinned versions.
-3. **Wait for interest.** Wait for the upstream maintainer's response before writing PRs. Then develop in a fork, with Node 24, the T0 contract, and live verification on our fixture.
-4. **Track each item here.** For each one, record its link and state: filed, accepted, PR open, merged, or declined. If declined, record the DF_AI-side workaround.
+1. **Build in DF_AI first.** Implement each needed capability in DF_AI's own controller or adapter layer. Wrap dfhack-mcp where it already works, and add DF_AI-side code where it doesn't. For example, reaction orders go through DFHack's `workorder`, and retry safety comes from the controller ledger.
+2. **Keep this table current.** For each candidate, note where DF_AI implemented it and whether it proved generally useful.
+3. **Review upstream later as a batch.** Once DF_AI's version works, the maintainer decides whether to offer anything upstream, and how much. Only then would issues or PRs be filed, under the owner's account and signed by the AI collaborator.
