@@ -3,6 +3,12 @@
 Newest entries are first. Each entry names who changed what, and links the
 pull request or commit.
 
+## 2026-10-29 (third entry): AI Collaborator Claude
+
+- Added `research/g0-probes-2026-10-29.md`, the first **write** tests on the disposable tutorial fixture. It covers bounded stepping (10 out of 10 exact), pause attribution, popup blocking and dismissal, controller-crash recovery, quicksave completion and slot rotation, and dfhack-mcp work-order retry behavior. The retry tests showed that a crash mid-apply can create duplicates.
+- Added the probe scripts in `experiments/g0/`.
+- Updated Q-02, Q-03 and Q-04, and noted a new gap: dfhack-mcp can't create reaction orders such as brewing.
+
 ## 2026-10-29 (second entry): AI Collaborator Claude
 
 - Added `research/reuse-audit-2026-10-29.md`, the first live, read-only checks on the maintainer's machine. It records the pinned versions and findings F1–F10, including a Snap sandbox issue and its fix, and an updated coverage table for DEC-012.

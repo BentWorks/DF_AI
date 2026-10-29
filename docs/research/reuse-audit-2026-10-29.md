@@ -44,12 +44,15 @@ Steam can't disable updates entirely. Before each test session, record the build
 | `designate` | dfhack-mcp `blueprint_apply`, dig and zone only. The actuator is not yet called. |
 | `construct` | **Gap** (F8) |
 | `configure_stockpile`, `set_farm_crops`, `find_sites` | **Gap.** Read sensors exist (`stockpiles`, `farming`, `geology`), but there are no write tools. |
-| work orders, `assign_work_detail` | dfhack-mcp actuators. Not yet called. |
+| work orders, `assign_work_detail` | dfhack-mcp actuators. Work orders were tested in the G0 probes. **There are no reaction orders**, so brewing is a gap. |
 | `pause`, `advance_until` | **Gap** (F7). The controller must build these. |
 | `checkpoint`, `verify_checkpoint`, reload | **Partial.** `game_save` dispatches only. There is no `load-save` (F9). |
 | `action_status`, `goal_status`, lifecycle | **Gap.** These belong to the controller. |
 
 ## Not done, and the next steps
+
+Items 1, 2 and 4 (the save side) were then tested in [g0-probes-2026-10-29.md](g0-probes-2026-10-29.md). The original list follows.
+
 
 1. **Actuator semantics (Q-04).** Calling any actuator writes to the game. Do it on a **disposable copy** of the save, with the maintainer's approval.
 2. **Time control and pause attribution (Q-02).** This needs advancing time, which changes the save. Use a disposable copy.
