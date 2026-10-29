@@ -146,7 +146,7 @@ class Game:
         warning = None
         if job and job.startswith("Construct") and not (material_category or material):
             warning = ("no material given: the game may never start an 'unknown material' order. "
-                       "Pass material_category, e.g. 'wood' or 'stone'.")
+                       "Pass material_category='wood' (or bone, cloth, leather...) or material='INORGANIC' for stone.")
         def do():
             before = {o["id"] for o in dfhack.lua_json("state.lua")["orders"]}
             try:
@@ -178,9 +178,32 @@ class Game:
 
     def dfhack_command(self, command: str) -> dict:
         parts = shlex.split(command)
+        if parts and parts[0] in ("enable", "disable") and len(parts) >= 2:
+            bad = [x for x in parts[1:] if x not in DFHACK_ALLOWED]
+            if bad:
+                return {"error": f"cannot {parts[0]} {bad}", "allowed": sorted(DFHACK_ALLOWED)}
+            return {"output": dfhack.run(*parts)[-4000:]}
         if not parts or parts[0] not in DFHACK_ALLOWED:
             return {"error": f"command not allowed: {parts[0] if parts else ''}", "allowed": sorted(DFHACK_ALLOWED)}
         return {"output": dfhack.run(*parts)[-4000:]}
+
+    def remove_building(self, building_id: int) -> dict:
+        return dfhack.lua_json("tools.lua", "remove_building", str(building_id))
+
+    def assign_owner(self, building_id: int, unit_id: int) -> dict:
+        return dfhack.lua_json("tools.lua", "assign_owner", str(building_id), str(unit_id))
+
+    def find_items(self, query: str) -> dict:
+        return dfhack.lua_json("tools.lua", "find_items", query)
+
+    def job_types(self, filter: str = "") -> dict:
+        return dfhack.lua_json("tools.lua", "job_types", filter)
+
+    def set_labor(self, unit_id: int, labor: str, enabled: bool) -> dict:
+        return dfhack.lua_json("tools.lua", "set_labor", str(unit_id), labor, "true" if enabled else "false")
+
+    def buildings(self, zones: bool = False) -> dict:
+        return dfhack.lua_json("tools.lua", "buildings", "zones" if zones else "all")
 
     def checkpoint(self, label: str = "checkpoint") -> dict:
         before = {p.name: p.stat().st_mtime for p in config.SAVE_DIR.iterdir() if p.is_dir()}

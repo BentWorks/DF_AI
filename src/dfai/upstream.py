@@ -24,6 +24,7 @@ class Upstream:
         self._p = None
         self._id = 0
         self._lock = threading.Lock()
+        self._schemas = None
 
     def _start(self):
         env = dict(os.environ, DFHACK_MCP_ACTUATORS="1", DFHACK_MCP_QUERY_DIR=str(config.UPSTREAM_QUERY_DIR) + "/")
@@ -57,7 +58,20 @@ class Upstream:
         with self._lock:
             if self._p is None or self._p.poll() is not None:
                 self._start()
-            res = self._rpc("tools/call", {"name": tool, "arguments": {k: v for k, v in (args or {}).items() if v is not None}})
+            if self._schemas is None:
+                self._schemas = {t["name"]: t.get("inputSchema", {}).get("properties", {}) for t in self._rpc("tools/list", {})["tools"]}
+            props = self._schemas.get(tool, {})
+            clean = {}
+            for k, v in (args or {}).items():
+                if v is None:
+                    continue
+                want = props.get(k, {}).get("type")        # upstream mixes string and integer ids; coerce to its schema
+                if want == "string" and isinstance(v, (int, float)) and not isinstance(v, bool):
+                    v = str(int(v)) if float(v).is_integer() else str(v)
+                elif want == "integer" and isinstance(v, str) and v.lstrip("-").isdigit():
+                    v = int(v)
+                clean[k] = v
+            res = self._rpc("tools/call", {"name": tool, "arguments": clean})
         text = "".join(c.get("text", "") for c in res.get("content", []))
         try:
             data = json.loads(text)
