@@ -42,7 +42,15 @@ conda create -p ~/dev/envs/df-ai python=3.11 -y && ~/dev/envs/df-ai/bin/pip inst
 **Clients:**
 - **Claude Code** picks the server up from the project's `.mcp.json`. To run headless:
   `claude -p "<goal>" --strict-mcp-config --mcp-config .mcp.json --allowedTools "mcp__dfai__*"`.
-- **Codex, Gemini CLI or agent-harness:** register `./dfai-server.sh` as a stdio MCP server.
+- **Codex CLI** (tested with codex-cli 0.160.0). In `exec` mode, MCP tools are refused unless pre-approved. `default_tools_approval_mode="approve"` works; `"auto"` and `"writes"` did not. Use `-s read-only` so Codex can only act through the game tools:
+  ```sh
+  codex exec -s read-only --skip-git-repo-check \
+    -c 'mcp_servers.dfai.command="/path/to/DF_AI/dfai-server.sh"' \
+    -c 'mcp_servers.dfai.tool_timeout_sec=300' \
+    -c 'mcp_servers.dfai.default_tools_approval_mode="approve"' \
+    "<goal>"
+  ```
+- **Gemini CLI or agent-harness:** register `./dfai-server.sh` as a stdio MCP server. These haven't been tested yet.
 
 Paths default to Snap Steam on Linux. Override them with `DFAI_DFHACK_DIR`, `DFAI_DF_DIR`, `DFAI_SAVE_DIR` and the other variables in `src/dfai/config.py`.
 
