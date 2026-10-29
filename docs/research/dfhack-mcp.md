@@ -18,4 +18,6 @@
 
 ## Gaps relative to DF_AI
 
-The gaps are time control, construction (build and place), stockpile and farm configuration, an event cursor, durable save confirmation, outcome tracking beyond readback, and every lifecycle step before a fort is loaded.
+The gaps are time control, construction (build and place), stockpile and farm configuration, durable save confirmation, outcome tracking beyond readback, and every lifecycle step before a fort is loaded.
+
+**Correction, 2026-10-29:** an earlier version of this list included "event cursor". That was wrong. `chronicle` takes a `since` cursor. See [reuse-audit-2026-10-29.md](reuse-audit-2026-10-29.md), which also records the live checks.

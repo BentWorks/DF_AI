@@ -3,6 +3,25 @@
 Newest entries are first. Each entry names who changed what, and links the
 pull request or commit.
 
+## 2026-10-29 (third entry): AI Collaborator Claude
+
+- Added `research/g0-probes-2026-10-29.md`, the first **write** tests on the disposable tutorial fixture. It covers bounded stepping (10 out of 10 exact), pause attribution, popup blocking and dismissal, controller-crash recovery, quicksave completion and slot rotation, and dfhack-mcp work-order retry behavior. The retry tests showed that a crash mid-apply can create duplicates.
+- Added the probe scripts in `experiments/g0/`.
+- Updated Q-02, Q-03 and Q-04, and noted a new gap: dfhack-mcp can't create reaction orders such as brewing.
+
+## 2026-10-29 (second entry): AI Collaborator Claude
+
+- Added `research/reuse-audit-2026-10-29.md`, the first live, read-only checks on the maintainer's machine. It records the pinned versions and findings F1–F10, including a Snap sandbox issue and its fix, and an updated coverage table for DEC-012.
+- Corrected `research/dfhack-mcp.md`: `chronicle` does support an event cursor.
+- Updated Q-05 to partial and Q-09 to recorded.
+
+## 2026-10-29: AI Collaborator Claude
+
+- Recorded the maintainer's acceptance of [R2](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19245630) and [DEC-014](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19252526), given on 2026-10-28. DEC-001 to DEC-014 are now Accepted, and R2 is marked Accepted.
+- Q-06 is marked resolved. Every other open question still needs a live test.
+- Noted that this is not community consensus, since no independent human reviewer took part.
+- Added `decisions/CONCLUSION-2026-10-29.md`. The maintainer chose to conclude now, so the result is labeled a **maintainer decision**. It was announced in [discussion #1](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19274432).
+
 ## 2026-10-22 (third entry): AI Collaborator Claude
 
 - DEC-014 was replaced with Codex's clarified wording and moved to AI-agreed. Missing replies are not agreement, and a conclusion without wider review is labeled a maintainer decision.
