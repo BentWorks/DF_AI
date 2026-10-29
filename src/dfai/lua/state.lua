@@ -18,9 +18,17 @@ end
 if cmd == 'identity' then
   local wd = df.global.world.world_data
   local wname = wd and dfhack.df2utf(dfhack.translation.translateName(wd.name, true)) or '?'
+  local mark = dfhack.persistent.getSiteData('dfai_branch', {})
   print(json.encode({world = wname, site_id = df.global.plotinfo.site_id, civ_id = df.global.plotinfo.civ_id,
-    abs_tick = df.global.cur_year * 403200 + df.global.cur_year_tick}))
+    abs_tick = df.global.cur_year * 403200 + df.global.cur_year_tick,
+    next_order_id = df.global.world.manager_orders.manager_order_next_id,
+    branch_token = mark.token or '', branch_seq = mark.seq or 0}))
   return
+end
+if cmd == 'mark_branch' then
+  -- stored in the save itself, so a reloaded save carries the marker from its own point in history
+  dfhack.persistent.saveSiteData('dfai_branch', {token = args[2], seq = tonumber(args[3])})
+  print(json.encode({ok = true})) return
 end
 if cmd == 'kick_orders' then
   local before = df.global.plotinfo.manager_timer
@@ -51,8 +59,12 @@ for _, b in ipairs(df.global.world.buildings.all) do
 end
 local orders = {}
 for _, o in ipairs(df.global.world.manager_orders.all) do
+  local cats = {}
+  for k, v in pairs(o.material_category) do if v == true then table.insert(cats, k) end end
   table.insert(orders, {id = o.id, job = df.job_type[o.job_type], reaction = (o.reaction_name ~= '' and o.reaction_name or nil),
-    total = o.amount_total, left = o.amount_left, validated = o.status.validated, active = o.status.active})
+    total = o.amount_total, left = o.amount_left, validated = o.status.validated, active = o.status.active,
+    frequency = df.workquota_frequency_type[o.frequency], mat_type = o.mat_type, mat_index = o.mat_index,
+    material_category = cats})
 end
 print(json.encode({
   date = string.format('%d %s, year %d', day, months[month + 1] or '?', df.global.cur_year),

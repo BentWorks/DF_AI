@@ -33,8 +33,10 @@ Orders need a suitable workshop, materials, and dwarves allowed to do the labor 
 `set_labor` for other labors). Use `find_items` to count tools and materials (e.g. 'pick', 'barrel', 'log').
 Nobles matter: appoint MANAGER (orders), BROKER (trade), BOOKKEEPER, CHIEF_MEDICAL_DWARF with `appoint`.
 Rooms: build a bed, make a bedroom zone around it, then `assign_owner(zone_id, unit_id)`; same for offices.
-Every mutating tool returns a receipt (status + key) recorded in `action_log`. Omit `key` for a new request; to retry the
-SAME request after an error or timeout, pass the same `key` - the server checks the game before repeating it.
+Every mutating tool returns a receipt (status + key) recorded in `action_log`. For anything you might need to retry,
+CHOOSE a `key` yourself before calling (e.g. 'beds-1'), so you can retry after a lost response. Retrying with the
+same key makes the server check the game first; it only repeats the action if it can prove it never happened, and
+otherwise answers 'unknown' - then inspect the game before acting again.
 A status of 'applied' means the game accepted the change, not that the work is finished: check `observe` later."""
 
 mcp = MCPServer("dfai", instructions=INSTRUCTIONS)
@@ -152,17 +154,17 @@ def labor(unit_id: int, detail: str, enabled: bool = True, key: str | None = Non
 
 @mcp.tool()
 @_safe
-def dfhack(command: str) -> str:
+def dfhack(command: str, key: str | None = None) -> str:
     """Run an allowed DFHack automation command, e.g. 'enable autochop', 'enable seedwatch', 'seedwatch all 30',
     'enable autofarm', 'autofarm default 30', 'enable autobutcher', 'orders import library/basic'."""
-    return _j(game().dfhack_command(command))
+    return _j(game().dfhack_command(command, key))
 
 
 @mcp.tool()
 @_safe
-def checkpoint(label: str = "checkpoint") -> str:
+def checkpoint(label: str = "checkpoint", key: str | None = None) -> str:
     """Save the game (quicksave) and copy the save to the controller's checkpoint store. Takes ~10 seconds."""
-    return _j(game().checkpoint(label))
+    return _j(game().checkpoint(label, key))
 
 
 @mcp.tool()
@@ -174,9 +176,9 @@ def action_log(limit: int = 20) -> str:
 
 @mcp.tool()
 @_safe
-def remove_building(building_id: int) -> str:
+def remove_building(building_id: int, key: str | None = None) -> str:
     """Mark a building (workshop, furniture) for deconstruction, or remove a zone/stockpile. Ids from `buildings`."""
-    return _j(game().remove_building(building_id))
+    return _j(game().remove_building(building_id, key))
 
 
 @mcp.tool()
@@ -188,9 +190,9 @@ def buildings(zones: bool = False) -> str:
 
 @mcp.tool()
 @_safe
-def assign_owner(building_id: int, unit_id: int) -> str:
+def assign_owner(building_id: int, unit_id: int, key: str | None = None) -> str:
     """Assign a bedroom/office/tomb zone (or a bed) to a citizen; unit_id -1 clears the owner."""
-    return _j(game().assign_owner(building_id, unit_id))
+    return _j(game().assign_owner(building_id, unit_id, key))
 
 
 @mcp.tool()
@@ -209,10 +211,10 @@ def job_types(filter: str = "") -> str:
 
 @mcp.tool()
 @_safe
-def set_labor(unit_id: int, labor: str, enabled: bool = True) -> str:
+def set_labor(unit_id: int, labor: str, enabled: bool = True, key: str | None = None) -> str:
     """Enable/disable one labor for one dwarf (e.g. MINE, CARPENTER, MASON, BREWER, COOK, PLANT, CUTWOOD).
     Labors that belong to a work detail are governed by the detail; use `labor` for those."""
-    return _j(game().set_labor(unit_id, labor, enabled))
+    return _j(game().set_labor(unit_id, labor, enabled, key))
 
 
 def main():

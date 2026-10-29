@@ -149,20 +149,40 @@ class Game:
             warning = ("no material given: the game may never start an 'unknown material' order. "
                        "Pass material_category='wood' (or bone, cloth, leather...) or material='INORGANIC' for stone.")
         def evidence():
-            return {"orders_before": [o["id"] for o in dfhack.lua_json("state.lua")["orders"]]}
-        def reconcile(prior):
-            before = set((prior.get("evidence") or {}).get("orders_before", []))
-            want_job, want_rx = job or "CustomReaction", reaction
-            hits = [o for o in dfhack.lua_json("state.lua")["orders"] if o["id"] not in before and o["job"] == want_job
-                    and (o.get("reaction") == want_rx if want_rx else True) and o["total"] == amount]
-            return {"created_orders": hits} if hits else None
+            ident = dfhack.lua_json("state.lua", "identity")
+            return {"orders_before": [o["id"] for o in dfhack.lua_json("state.lua")["orders"]],
+                    "next_order_id": ident["next_order_id"]}
+        def matches(o):
+            if o["job"] != (job or "CustomReaction") or o["total"] != amount or o.get("frequency") != frequency:
+                return False
+            if reaction and o.get("reaction") != reaction:
+                return False
+            if material_category and not set(m.strip() for m in material_category.split(",")) <= set(o.get("material_category") or []):
+                return False
+            if material == "INORGANIC" and o.get("mat_type") != 0:
+                return False
+            return True
+        def reconcile(prior, fort):
+            ev = prior.get("evidence") or {}
+            nid = ev.get("next_order_id")
+            claimed = self.ledger.claimed_order_ids(fort)
+            hits = sorted((o for o in dfhack.lua_json("state.lua")["orders"]
+                           if nid is not None and o["id"] >= nid and o["id"] not in claimed and matches(o)), key=lambda o: o["id"])
+            if hits:
+                return "applied", {"created_orders": [hits[0]]}
+            now_nid = dfhack.lua_json("state.lua", "identity")["next_order_id"]
+            if nid is not None and now_nid == nid:
+                return "proven_not_applied", {"evidence": "work-order id counter unchanged since the request"}
+            return "unknown", {"evidence": f"order ids {nid}..{now_nid - 1} were used since the request but none matches "
+                                           "an unclaimed current order; it may have been created and already completed or "
+                                           "cancelled. Check stocks/observe before ordering again."}
         def do():
             before = {o["id"] for o in dfhack.lua_json("state.lua")["orders"]}
             try:
                 out = dfhack.run("workorder", json.dumps(spec))
             except dfhack.DFHackError as e:
                 out = f"error: {e}"
-            after = [o for o in dfhack.lua_json("state.lua")["orders"] if o["id"] not in before]   # reconcile from the game
+            after = [o for o in dfhack.lua_json("state.lua")["orders"] if o["id"] not in before and matches(o)]
             kick = dfhack.lua_json("state.lua", "kick_orders")
             res = {"output": out[-600:], "created_orders": after, "restarted_order_checks": kick.get("kicked")}
             if warning: res["warning"] = warning
@@ -190,16 +210,16 @@ class Game:
         args = {"unit_id": unit_id, "detail": detail, "enabled": enabled}
         return self._ledgered("labor", args, key, lambda: self._preview_apply("assign_work_detail", args))
 
-    def dfhack_command(self, command: str) -> dict:
+    def dfhack_command(self, command: str, key: str | None = None) -> dict:
         parts = shlex.split(command)
         if parts and parts[0] in ("enable", "disable") and len(parts) >= 2:
             bad = [x for x in parts[1:] if x not in DFHACK_ALLOWED]
             if bad:
                 return {"error": f"cannot {parts[0]} {bad}", "allowed": sorted(DFHACK_ALLOWED)}
-            return self._ledgered("dfhack", {"command": command}, None, lambda: ("applied", {"output": dfhack.run(*parts)[-4000:]}))
+            return self._ledgered("dfhack", {"command": command}, key, lambda: ("applied", {"output": dfhack.run(*parts)[-4000:]}))
         if not parts or parts[0] not in DFHACK_ALLOWED:
             return {"error": f"command not allowed: {parts[0] if parts else ''}", "allowed": sorted(DFHACK_ALLOWED)}
-        return self._ledgered("dfhack", {"command": command}, None, lambda: ("applied", {"output": dfhack.run(*parts)[-4000:]}))
+        return self._ledgered("dfhack", {"command": command}, key, lambda: ("applied", {"output": dfhack.run(*parts)[-4000:]}))
 
     def remove_building(self, building_id: int, key: str | None = None) -> dict:
         return self._ledgered("remove_building", {"building_id": building_id}, key,
@@ -222,8 +242,8 @@ class Game:
     def buildings(self, zones: bool = False) -> dict:
         return dfhack.lua_json("tools.lua", "buildings", "zones" if zones else "all")
 
-    def checkpoint(self, label: str = "checkpoint") -> dict:
-        return self._ledgered("checkpoint", {"label": label}, None, lambda: self._checkpoint(label))
+    def checkpoint(self, label: str = "checkpoint", key: str | None = None) -> dict:
+        return self._ledgered("checkpoint", {"label": label}, key, lambda: self._checkpoint(label))
 
     def _checkpoint(self, label: str) -> dict:
         before = {p.name: p.stat().st_mtime for p in config.SAVE_DIR.iterdir() if p.is_dir()}
@@ -264,11 +284,23 @@ class Game:
         ident = dfhack.lua_json("state.lua", "identity")
         fort = f"{ident['world']}#site{ident['site_id']}"
         stale = self.ledger.observe_tick(fort, ident["abs_tick"])
+        token, seq = self.ledger.branch(fort)
+        if token and (ident["branch_token"] != token or ident["branch_seq"] < seq):
+            # the loaded game state was saved before some of our receipts (or is a different branch)
+            stale += self.ledger.mark_after_seq_stale(fort, ident["branch_seq"] if ident["branch_token"] == token else 0)
+            self.ledger.set_branch(fort, token, ident["branch_seq"] if ident["branch_token"] == token else 0)
         return fort, ident["abs_tick"], stale
+
+    def _mark(self, fort, record_id):
+        token, _ = self.ledger.branch(fort)
+        token = token or uuid.uuid4().hex[:12]
+        dfhack.lua_json("state.lua", "mark_branch", token, str(record_id))
+        self.ledger.set_branch(fort, token, record_id)
 
     def _ledgered(self, kind, params, key, fn, evidence_fn=None, reconcile_fn=None):
         """Run a mutation under a durable receipt. `key` is the caller's request identity: omit it for a fresh
-        request; reuse it to retry the SAME request safely. Unresolved prior attempts are reconciled, not repeated."""
+        request; reuse it to retry the SAME request. Unresolved attempts are reconciled against game evidence and
+        replayed only when non-application is proven; otherwise they stay 'unknown'."""
         fort, tick, stale = self._fort()
         canon = json.loads(json.dumps(params, sort_keys=True))
         key = key or f"{kind}:{uuid.uuid4().hex[:12]}"
@@ -279,19 +311,24 @@ class Game:
                         "prior": prior}
             if prior["execution_status"] in ("applied", "blocked", "failed"):
                 return {"status": "already_recorded", "key": key, "record": prior}
-            if prior["execution_status"] in ("requested", "unknown") and reconcile_fn:
-                found = reconcile_fn(prior)
-                if found is not None:
-                    self.ledger.finish(fort, key, "applied", {"reconciled": True, **found})
-                    return {"status": "applied", "key": key, "reconciled_from": prior["execution_status"], **found}
-                self.ledger.finish(fort, key, "failed", {"reconciled": True, "note": "no game evidence it was applied"})
-                prior = None  # safe to try again under the same key
-                self.ledger.db.execute("DELETE FROM actions WHERE fort=? AND key=?", (fort, key)); self.ledger.db.commit()
-            elif prior["execution_status"] in ("requested", "unknown", "stale"):
+            if not reconcile_fn:
                 return {"status": "unresolved", "key": key, "record": prior,
-                        "note": "outcome unknown; check the game (observe/buildings/action_log) and retry with a NEW key if needed"}
+                        "note": "outcome unknown and this action kind cannot yet be reconciled automatically; "
+                                "inspect the game (observe / buildings / positions) before deciding what to do"}
+            verdict, info = reconcile_fn(prior, fort)
+            if verdict == "applied":
+                self.ledger.finish(fort, key, "applied", {"reconciled": True, **info})
+                return {"status": "applied", "key": key, "reconciled_from": prior["execution_status"], **info}
+            if verdict != "proven_not_applied":
+                self.ledger.finish(fort, key, "unknown", {"reconciled": True, **info})
+                return {"status": "unknown", "key": key, **info}
+            # proven not applied: fall through and retry under the same key (history kept)
         evidence = evidence_fn() if evidence_fn else None
-        self.ledger.start(fort, key, kind, canon, tick, evidence)
+        rid = self.ledger.start(fort, key, kind, canon, tick, evidence)
+        try:
+            self._mark(fort, rid)
+        except Exception:
+            pass
         try:
             out = fn()
             status, result = out if isinstance(out, tuple) else (out.get("status") or ("applied" if out.get("ok", True) else "failed"), out)
@@ -300,7 +337,7 @@ class Game:
         self.ledger.finish(fort, key, status, result)
         out = {"status": status, "key": key, **(result if isinstance(result, dict) else {"result": result})}
         if stale:
-            out["note_reload_detected"] = f"{stale} earlier open records marked stale (game time moved backwards)"
+            out["note_reload_detected"] = f"{stale} receipts marked stale: the loaded game state predates them"
         return out
 
     def _ensure_blueprint_link(self):
