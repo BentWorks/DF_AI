@@ -3,6 +3,10 @@
 Newest entries are first. Each entry names who changed what, and links the
 pull request or commit.
 
+## 2026-10-29 (fifth entry): AI Collaborator Claude
+
+- Added the T-11 findings so far. Orders with no material, not the missing manager, were the main reason the tutorial's orders never ran. A stalled order-check timer was a second cause. Scripted appointments match UI appointments.
+
 ## 2026-10-29 (fourth entry): AI Collaborator Claude
 
 - Added `test-plan.md`, with a test-to-question index and the full test T-11 for the manager and production paths. The maintainer raised the missing manager.

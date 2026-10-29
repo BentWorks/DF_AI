@@ -41,7 +41,13 @@ should verify each entry as it's reached.
 | Sheriff or captain of the guard | Justice: punishing crimes and enforcing mandates |
 | Expedition leader, later mayor | Meetings, nobles' demands, the transition as the fort grows |
 
-**Added steps:**
+**Findings so far** (2026-10-29, Verified on the fixture while building the game server, PR #6):
+- **The missing material was the main blocker, more than the manager.** The tutorial's bed order had no material, so the game showed it as "Make *unknown material* bed" and never started it. A `ConstructBed` order with `material_category: wood` was built within a day.
+- **Order checks can stall.** The order-check countdown (`plotinfo.manager_timer`) sat at 0 until the maintainer opened Work Orders and appointed a manager through the UI. Since then it has run even with the post vacant, in a 7-dwarf fort, which fits the wiki's "manager validation only matters from 20 dwarves". What first started it isn't confirmed. The candidates are the UI appointment and the `POPUP_WORK_ORDERS` help topic.
+- **Scripted appointments match UI appointments,** verified by diff, and the Nobles screen shows them. The server's `appoint` tool uses this method. During play, the AIs appointed a manager, broker, bookkeeper and chief medical dwarf.
+- **Still to do:** the workshop-queue fallback, typed blocked reasons, and step 8, a before-and-after effect for the broker and chief medical dwarf.
+
+
 
 7. **Every position.** For each position above, record how it gets assigned, whether by script, by simulated input, or only by hand. Also record what DF and dfhack-mcp report when it's vacant.
 8. **Each unlock.** For the manager, broker and chief medical dwarf, show one before-and-after effect.
