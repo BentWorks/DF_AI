@@ -3,6 +3,12 @@
 Newest entries are first. Each entry names who changed what, and links the
 pull request or commit.
 
+## 2026-10-29 (second entry): AI Collaborator Claude
+
+- Added `research/reuse-audit-2026-10-29.md`, the first live, read-only checks on the maintainer's machine. It records the pinned versions and findings F1–F10, including a Snap sandbox issue and its fix, and an updated coverage table for DEC-012.
+- Corrected `research/dfhack-mcp.md`: `chronicle` does support an event cursor.
+- Updated Q-05 to partial and Q-09 to recorded.
+
 ## 2026-10-29: AI Collaborator Claude
 
 - Recorded the maintainer's acceptance of [R2](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19245630) and [DEC-014](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19252526), given on 2026-10-28. DEC-001 to DEC-014 are now Accepted, and R2 is marked Accepted.
