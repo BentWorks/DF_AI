@@ -15,6 +15,13 @@ if cmd == 'dismiss_popups' then
   while #v > 0 do local p = v[0]; v:erase(0); p:delete() end
   print(json.encode({dismissed = texts})) return
 end
+if cmd == 'identity' then
+  local wd = df.global.world.world_data
+  local wname = wd and dfhack.df2utf(dfhack.translation.translateName(wd.name, true)) or '?'
+  print(json.encode({world = wname, site_id = df.global.plotinfo.site_id, civ_id = df.global.plotinfo.civ_id,
+    abs_tick = df.global.cur_year * 403200 + df.global.cur_year_tick}))
+  return
+end
 if cmd == 'kick_orders' then
   local before = df.global.plotinfo.manager_timer
   if before == 0 then df.global.plotinfo.manager_timer = 1 end

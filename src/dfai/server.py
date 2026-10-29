@@ -33,7 +33,9 @@ Orders need a suitable workshop, materials, and dwarves allowed to do the labor 
 `set_labor` for other labors). Use `find_items` to count tools and materials (e.g. 'pick', 'barrel', 'log').
 Nobles matter: appoint MANAGER (orders), BROKER (trade), BOOKKEEPER, CHIEF_MEDICAL_DWARF with `appoint`.
 Rooms: build a bed, make a bedroom zone around it, then `assign_owner(zone_id, unit_id)`; same for offices.
-Every action is recorded; repeating an action with the same `key` will not duplicate it."""
+Every mutating tool returns a receipt (status + key) recorded in `action_log`. Omit `key` for a new request; to retry the
+SAME request after an error or timeout, pass the same `key` - the server checks the game before repeating it.
+A status of 'applied' means the game accepted the change, not that the work is finished: check `observe` later."""
 
 mcp = MCPServer("dfai", instructions=INSTRUCTIONS)
 _game: Game | None = None
@@ -118,25 +120,34 @@ def order(amount: int, job: str | None = None, reaction: str | None = None, mate
 
 @mcp.tool()
 @_safe
-def cancel_order(order_id: int) -> str:
+def cancel_order(order_id: int, key: str | None = None) -> str:
     """Cancel a manager work order by id (see observe -> orders)."""
-    return _j(game().cancel_order(order_id))
+    return _j(game().cancel_order(order_id, key))
 
 
 @mcp.tool()
 @_safe
-def appoint(position: str, unit_id: int, replace: bool = False) -> str:
-    """Appoint a citizen to a noble/administrator position (MANAGER, BROKER, BOOKKEEPER, CHIEF_MEDICAL_DWARF,
-    MILITIA_COMMANDER, SHERIFF, ...). One dwarf may hold several. Set replace=true to replace the current holder."""
-    return _j(game().appoint(position, unit_id, replace))
+def appoint(position: str, unit_id: int, replace: bool = False, key: str | None = None) -> str:
+    """Appoint a living adult citizen to a noble/administrator position (MANAGER, BROKER, BOOKKEEPER,
+    CHIEF_MEDICAL_DWARF, MILITIA_COMMANDER, SHERIFF, HAMMERER...). Follows the game's rules: elected and not-yet-
+    available positions are refused (see `positions`). One dwarf may hold several. replace=true replaces the
+    current holder only after the new candidate is validated; the old holder is kept if anything fails."""
+    return _j(game().appoint(position, unit_id, replace, key))
 
 
 @mcp.tool()
 @_safe
-def labor(unit_id: int, detail: str, enabled: bool = True) -> str:
+def positions() -> str:
+    """Noble/administrator positions: holders, vacancies, and whether each can be appointed now (and why not)."""
+    return _j(game().positions())
+
+
+@mcp.tool()
+@_safe
+def labor(unit_id: int, detail: str, enabled: bool = True, key: str | None = None) -> str:
     """Add (enabled=true) or remove a citizen from a work detail (e.g. 'Woodworkers', 'Miners', 'Stoneworkers',
     'Farmers', 'Haulers'). See sensor('work_details') for the fort's details and members."""
-    return _j(game().labor(unit_id, detail, enabled))
+    return _j(game().labor(unit_id, detail, enabled, key))
 
 
 @mcp.tool()

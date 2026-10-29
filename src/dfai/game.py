@@ -1,6 +1,7 @@
 """High-level game operations used by the MCP server (and usable directly from Python)."""
 import hashlib
 import json
+import uuid
 import os
 import shlex
 import shutil
@@ -147,6 +148,14 @@ class Game:
         if job and job.startswith("Construct") and not (material_category or material):
             warning = ("no material given: the game may never start an 'unknown material' order. "
                        "Pass material_category='wood' (or bone, cloth, leather...) or material='INORGANIC' for stone.")
+        def evidence():
+            return {"orders_before": [o["id"] for o in dfhack.lua_json("state.lua")["orders"]]}
+        def reconcile(prior):
+            before = set((prior.get("evidence") or {}).get("orders_before", []))
+            want_job, want_rx = job or "CustomReaction", reaction
+            hits = [o for o in dfhack.lua_json("state.lua")["orders"] if o["id"] not in before and o["job"] == want_job
+                    and (o.get("reaction") == want_rx if want_rx else True) and o["total"] == amount]
+            return {"created_orders": hits} if hits else None
         def do():
             before = {o["id"] for o in dfhack.lua_json("state.lua")["orders"]}
             try:
@@ -160,21 +169,26 @@ class Game:
             if after:
                 return "applied", res
             return ("failed" if ("error" in out.lower() or "invalid" in out.lower() or "unknown" in out.lower()) else "unknown"), res
-        return self._ledgered("order", params, key, do)
+        return self._ledgered("order", params, key, do, evidence, reconcile)
 
-    def cancel_order(self, order_id: int) -> dict:
-        return self._preview_apply("work_order_cancel", {"order_id": order_id})
+    def cancel_order(self, order_id: int, key: str | None = None) -> dict:
+        return self._ledgered("cancel_order", {"order_id": order_id}, key,
+                              lambda: self._preview_apply("work_order_cancel", {"order_id": order_id}))
 
-    def appoint(self, position: str, unit_id: int, replace: bool = False) -> dict:
-        if replace:
-            dfhack.lua_json("positions.lua", "vacate", position)
-        res = dfhack.lua_json("positions.lua", "assign", position, str(unit_id))
-        if res.get("ok"):
-            res["restarted_order_checks"] = dfhack.lua_json("state.lua", "kick_orders").get("kicked")
-        return res
+    def appoint(self, position: str, unit_id: int, replace: bool = False, key: str | None = None) -> dict:
+        def do():
+            res = dfhack.lua_json("positions.lua", "assign", position, str(unit_id), *(["replace"] if replace else []))
+            if res.get("ok") and not res.get("unchanged"):
+                res["restarted_order_checks"] = dfhack.lua_json("state.lua", "kick_orders").get("kicked")
+            return ("applied" if res.get("ok") else "blocked"), res
+        return self._ledgered("appoint", {"position": position, "unit_id": unit_id, "replace": replace}, key, do)
 
-    def labor(self, unit_id: int, detail: str, enabled: bool) -> dict:
-        return self._preview_apply("assign_work_detail", {"unit_id": unit_id, "detail": detail, "enabled": enabled})
+    def positions(self) -> dict:
+        return dfhack.lua_json("positions.lua", "list")
+
+    def labor(self, unit_id: int, detail: str, enabled: bool, key: str | None = None) -> dict:
+        args = {"unit_id": unit_id, "detail": detail, "enabled": enabled}
+        return self._ledgered("labor", args, key, lambda: self._preview_apply("assign_work_detail", args))
 
     def dfhack_command(self, command: str) -> dict:
         parts = shlex.split(command)
@@ -182,16 +196,18 @@ class Game:
             bad = [x for x in parts[1:] if x not in DFHACK_ALLOWED]
             if bad:
                 return {"error": f"cannot {parts[0]} {bad}", "allowed": sorted(DFHACK_ALLOWED)}
-            return {"output": dfhack.run(*parts)[-4000:]}
+            return self._ledgered("dfhack", {"command": command}, None, lambda: ("applied", {"output": dfhack.run(*parts)[-4000:]}))
         if not parts or parts[0] not in DFHACK_ALLOWED:
             return {"error": f"command not allowed: {parts[0] if parts else ''}", "allowed": sorted(DFHACK_ALLOWED)}
-        return {"output": dfhack.run(*parts)[-4000:]}
+        return self._ledgered("dfhack", {"command": command}, None, lambda: ("applied", {"output": dfhack.run(*parts)[-4000:]}))
 
-    def remove_building(self, building_id: int) -> dict:
-        return dfhack.lua_json("tools.lua", "remove_building", str(building_id))
+    def remove_building(self, building_id: int, key: str | None = None) -> dict:
+        return self._ledgered("remove_building", {"building_id": building_id}, key,
+                              lambda: dfhack.lua_json("tools.lua", "remove_building", str(building_id)))
 
-    def assign_owner(self, building_id: int, unit_id: int) -> dict:
-        return dfhack.lua_json("tools.lua", "assign_owner", str(building_id), str(unit_id))
+    def assign_owner(self, building_id: int, unit_id: int, key: str | None = None) -> dict:
+        return self._ledgered("assign_owner", {"building_id": building_id, "unit_id": unit_id}, key,
+                              lambda: dfhack.lua_json("tools.lua", "assign_owner", str(building_id), str(unit_id)))
 
     def find_items(self, query: str) -> dict:
         return dfhack.lua_json("tools.lua", "find_items", query)
@@ -199,13 +215,17 @@ class Game:
     def job_types(self, filter: str = "") -> dict:
         return dfhack.lua_json("tools.lua", "job_types", filter)
 
-    def set_labor(self, unit_id: int, labor: str, enabled: bool) -> dict:
-        return dfhack.lua_json("tools.lua", "set_labor", str(unit_id), labor, "true" if enabled else "false")
+    def set_labor(self, unit_id: int, labor: str, enabled: bool, key: str | None = None) -> dict:
+        return self._ledgered("set_labor", {"unit_id": unit_id, "labor": labor, "enabled": enabled}, key,
+                              lambda: dfhack.lua_json("tools.lua", "set_labor", str(unit_id), labor, "true" if enabled else "false"))
 
     def buildings(self, zones: bool = False) -> dict:
         return dfhack.lua_json("tools.lua", "buildings", "zones" if zones else "all")
 
     def checkpoint(self, label: str = "checkpoint") -> dict:
+        return self._ledgered("checkpoint", {"label": label}, None, lambda: self._checkpoint(label))
+
+    def _checkpoint(self, label: str) -> dict:
         before = {p.name: p.stat().st_mtime for p in config.SAVE_DIR.iterdir() if p.is_dir()}
         dfhack.run("quicksave")
         t0 = time.time()
@@ -222,14 +242,15 @@ class Game:
                     break
             time.sleep(0.5)
         if not slot:
-            return {"ok": False, "error": "no autosave slot changed within 120s"}
+            return "unknown", {"ok": False, "error": "no autosave slot changed within 120s"}
         tick = dfhack.lua_json("state.lua")["tick"]
         dest = config.CHECKPOINT_DIR / f"{_slug(label)}_{tick}"
         shutil.copytree(config.SAVE_DIR / slot, dest, dirs_exist_ok=True)
         return {"ok": True, "slot": slot, "copied_to": str(dest), "seconds": round(time.time() - t0, 1)}
 
     def action_log(self, limit: int = 20) -> list:
-        return self.ledger.recent(limit)
+        fort, _, _ = self._fort()
+        return self.ledger.recent(fort, limit)
 
     # ---------- helpers ----------
     def _preview_apply(self, tool: str, args: dict) -> dict:
@@ -239,20 +260,48 @@ class Game:
         res = self.up.call(tool, {**args, "confirm_token": prev["confirm_token"]})
         return {"status": "applied" if res.get("applied") else "unknown", "preview": prev.get("preview"), "result": res}
 
-    def _ledgered(self, kind, params, key, fn):
-        key = key or kind + ":" + hashlib.sha1(json.dumps(params, sort_keys=True).encode()).hexdigest()[:16]
-        prior = self.ledger.get(key)
-        if prior and prior["execution_status"] in ("applied", "requested", "unknown"):
-            return {"status": "already_done", "note": "same idempotency key seen before; not repeated", "record": prior}
-        if not prior:
-            self.ledger.start(key, kind, params)
+    def _fort(self):
+        ident = dfhack.lua_json("state.lua", "identity")
+        fort = f"{ident['world']}#site{ident['site_id']}"
+        stale = self.ledger.observe_tick(fort, ident["abs_tick"])
+        return fort, ident["abs_tick"], stale
+
+    def _ledgered(self, kind, params, key, fn, evidence_fn=None, reconcile_fn=None):
+        """Run a mutation under a durable receipt. `key` is the caller's request identity: omit it for a fresh
+        request; reuse it to retry the SAME request safely. Unresolved prior attempts are reconciled, not repeated."""
+        fort, tick, stale = self._fort()
+        canon = json.loads(json.dumps(params, sort_keys=True))
+        key = key or f"{kind}:{uuid.uuid4().hex[:12]}"
+        prior = self.ledger.get(fort, key)
+        if prior:
+            if prior["params"] != canon:
+                return {"status": "key_conflict", "key": key, "error": "this key was already used for a different request",
+                        "prior": prior}
+            if prior["execution_status"] in ("applied", "blocked", "failed"):
+                return {"status": "already_recorded", "key": key, "record": prior}
+            if prior["execution_status"] in ("requested", "unknown") and reconcile_fn:
+                found = reconcile_fn(prior)
+                if found is not None:
+                    self.ledger.finish(fort, key, "applied", {"reconciled": True, **found})
+                    return {"status": "applied", "key": key, "reconciled_from": prior["execution_status"], **found}
+                self.ledger.finish(fort, key, "failed", {"reconciled": True, "note": "no game evidence it was applied"})
+                prior = None  # safe to try again under the same key
+                self.ledger.db.execute("DELETE FROM actions WHERE fort=? AND key=?", (fort, key)); self.ledger.db.commit()
+            elif prior["execution_status"] in ("requested", "unknown", "stale"):
+                return {"status": "unresolved", "key": key, "record": prior,
+                        "note": "outcome unknown; check the game (observe/buildings/action_log) and retry with a NEW key if needed"}
+        evidence = evidence_fn() if evidence_fn else None
+        self.ledger.start(fort, key, kind, canon, tick, evidence)
         try:
             out = fn()
-            status, result = out if isinstance(out, tuple) else (out.get("status", "applied"), out)
+            status, result = out if isinstance(out, tuple) else (out.get("status") or ("applied" if out.get("ok", True) else "failed"), out)
         except Exception as e:  # leave a durable trace even on crashes
-            status, result = "unknown", {"error": str(e)}
-        self.ledger.finish(key, status, result)
-        return {"status": status, "key": key, **(result if isinstance(result, dict) else {"result": result})}
+            status, result = "unknown", {"error": f"{type(e).__name__}: {e}"}
+        self.ledger.finish(fort, key, status, result)
+        out = {"status": status, "key": key, **(result if isinstance(result, dict) else {"result": result})}
+        if stale:
+            out["note_reload_detected"] = f"{stale} earlier open records marked stale (game time moved backwards)"
+        return out
 
     def _ensure_blueprint_link(self):
         link = config.DF_DIR / "dfhack-config/blueprints/dfai"
