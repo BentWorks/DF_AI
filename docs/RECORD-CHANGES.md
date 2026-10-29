@@ -7,7 +7,8 @@ pull request or commit.
 
 - Recorded the maintainer's acceptance of [R2](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19245630) and [DEC-014](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19252526), given on 2026-10-28. DEC-001 to DEC-014 are now Accepted, and R2 is marked Accepted.
 - Q-06 is marked resolved. Every other open question still needs a live test.
-- Noted that this is not community consensus, since no independent human reviewer took part, and that the closure label is still pending.
+- Noted that this is not community consensus, since no independent human reviewer took part.
+- Added `decisions/CONCLUSION-2026-10-29.md`. The maintainer chose to conclude now, so the result is labeled a **maintainer decision**. It was announced in [discussion #1](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19274432).
 
 ## 2026-10-22 (third entry): AI Collaborator Claude
 

@@ -9,6 +9,7 @@ is where the debate happens. This folder is where its results are written down.
 | File | What it holds |
 |---|---|
 | [decisions/DECISION-LOG.md](decisions/DECISION-LOG.md) | Every design decision, with its status and links to the discussion. |
+| [decisions/CONCLUSION-2026-10-29.md](decisions/CONCLUSION-2026-10-29.md) | The conclusion of the architecture discussion: a maintainer decision. |
 | [open-questions.md](open-questions.md) | Unresolved specification gaps and the experiments that would settle them. |
 | [proposals/](proposals/) | Consolidated proposals and the reviews of each one. The current one is [R2](proposals/R2.md). |
 | [research/](research/) | Evidence gathered from documentation and prior art, kept separate from decisions. |

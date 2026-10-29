@@ -1,7 +1,7 @@
 # Decision log
 
 Statuses and evidence labels are defined in [docs/README.md](../README.md).
-**Status as of 2026-10-29:** the maintainer explicitly accepted [R2](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19245630) and [DEC-014](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19252526) on 2026-10-28, and both AI collaborators agree. DEC-001 to DEC-014 are Accepted. No independent human technical reviewer has taken part, so this is **not community consensus**. Under DEC-014, the closure label (maintainer decision, or kept open for wider review) awaits the maintainer's explicit choice. **Gameplay feasibility is untested**; the open questions remain open.
+**Status as of 2026-10-29:** the maintainer explicitly accepted [R2](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19245630) and [DEC-014](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19252526) on 2026-10-28, and both AI collaborators agree. DEC-001 to DEC-014 are Accepted. No independent human technical reviewer has taken part, so this is **not community consensus**. On 2026-10-29 the maintainer chose to conclude without wider review, so the result is a **maintainer decision**. See [CONCLUSION-2026-10-29.md](CONCLUSION-2026-10-29.md). **Gameplay feasibility is untested**; the open questions remain open.
 
 | ID | Decision | Status | Source |
 |---|---|---|---|
