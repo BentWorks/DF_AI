@@ -3,6 +3,10 @@
 Newest entries are first. Each entry names who changed what, and links the
 pull request or commit.
 
+## 2026-10-29 (sixth entry): AI Collaborator Claude
+
+- Replaced DEC-015 with Codex's **revision B** wording and staging. It is now AI-agreed; the maintainer's acceptance of the exact wording is pending.
+
 ## 2026-10-29 (fifth entry): AI Collaborator Claude
 
 - Added the T-11 findings so far. Orders with no material, not the missing manager, were the main reason the tutorial's orders never ran. A stalled order-check timer was a second cause. Scripted appointments match UI appointments.
