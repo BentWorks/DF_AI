@@ -1,6 +1,9 @@
-"""Fault tests for the DF_AI receipt/ledger contract against the live game (disposable fixture only).
+"""Receipt/ledger fault tests against the live game (disposable fixture only). Exit code 1 if any case fails.
+SIMULATION NOTE: "crashes" are simulated by writing a 'requested' receipt with pre-dispatch evidence and then
+(optionally) dispatching the order outside the ledger; "reloads" are simulated by writing an older branch marker
+into the live game. Neither is a real process crash or a real save load.
 Run: PYTHONPATH=src ~/dev/envs/df-ai/bin/python experiments/g0/test_receipts.py"""
-import json
+import json, sys
 from dfai.game import Game
 from dfai import dfhack
 
@@ -8,53 +11,76 @@ g = Game()
 orders = lambda: dfhack.lua_json("state.lua")["orders"]
 ids = lambda job: [o["id"] for o in orders() if o["job"] == job]
 ident = lambda: dfhack.lua_json("state.lua", "identity")
-R = {}
+wo = lambda spec: dfhack.run("workorder", json.dumps(spec))
+results = []
+import uuid
+RUN = uuid.uuid4().hex[:6]   # keys are unique per run, so reruns test fresh requests
+K = lambda k: f"{RUN}-{k}"
+
+def check(name, guarantee, cond, detail):
+    results.append((guarantee, name, bool(cond), detail))
 
 def pending(key, params):
-    """Simulate a crash right after dispatch: receipt left 'requested' with pre-dispatch evidence."""
     fort, tick, _ = g._fort()
-    ev = {"orders_before": [o["id"] for o in orders()], "next_order_id": ident()["next_order_id"]}
-    g.ledger.start(fort, key, "order", params, tick, ev)
+    g.ledger.start(fort, key, "order", params, tick, {"orders_before": [o["id"] for o in orders()], "next_order_id": ident()["next_order_id"]})
 
-P = lambda job, amt=1, cat="wood", mat=None, freq="OneTime", rx=None: {"job": job, "reaction": rx, "amount": amt,
-     "material_category": cat, "material": mat, "frequency": freq}
+P = lambda job, amt=1, cat="wood", mat=None, freq="OneTime": {"job": job, "reaction": None, "amount": amt, "material_category": cat, "material": mat, "frequency": freq}
 
-# 1. distinct requests for identical orders are both honoured
-n0 = len(ids("ConstructTable")); a = g.order(1, job="ConstructTable", material_category="wood"); b = g.order(1, job="ConstructTable", material_category="wood")
-R["1 identical requests both created"] = (a["status"], b["status"], len(ids("ConstructTable")) - n0 == 2)
-# 2. same key, different parameters -> conflict
-g.order(1, job="ConstructDoor", material_category="wood", key="t2-door")
-R["2 key conflict"] = g.order(2, job="ConstructDoor", material_category="wood", key="t2-door")["status"] == "key_conflict"
-# 3. applied but unacknowledged, still present -> reconciled applied, no duplicate
-pending("t3", P("ConstructBin")); dfhack.run("workorder", json.dumps({"job": "ConstructBin", "amount_total": 1, "material_category": ["wood"]}))
-nb = len(ids("ConstructBin")); r = g.order(1, job="ConstructBin", material_category="wood", key="t3")
-R["3 applied+present -> applied, no dup"] = (r["status"], r.get("reconciled_from"), len(ids("ConstructBin")) == nb)
-# 4. never applied: id counter unchanged -> proven not applied -> retried exactly once; repeat is not re-run
-pending("t4", P("ConstructBlocks", cat=None, mat="INORGANIC")); n4 = len(ids("ConstructBlocks"))
-r = g.order(1, job="ConstructBlocks", material="INORGANIC", key="t4"); r2 = g.order(1, job="ConstructBlocks", material="INORGANIC", key="t4")
-R["4 never applied -> retried once"] = (r["status"], r2["status"], len(ids("ConstructBlocks")) - n4 == 1,
-                                         bool(g.ledger.get(g._fort()[0], "t4")["result"].get("attempts")))
-# a. applied but removed before reconciliation -> must stay unknown (no replay)
-pending("ta", P("ConstructCabinet")); dfhack.run("workorder", json.dumps({"job": "ConstructCabinet", "amount_total": 1, "material_category": ["wood"]}))
+# --- duplicate suppression ---
+n = len(ids("ConstructTable")); a = g.order(1, job="ConstructTable", material_category="wood"); b = g.order(1, job="ConstructTable", material_category="wood")
+check("identical keyless requests are both honoured", "duplicate suppression", a["status"] == b["status"] == "applied" and len(ids("ConstructTable")) - n == 2, (a["status"], b["status"]))
+g.order(1, job="ConstructDoor", material_category="wood", key=K("k-door"))
+r = g.order(2, job="ConstructDoor", material_category="wood", key=K("k-door"))
+check("same key + different params -> key_conflict", "duplicate suppression", r["status"] == "key_conflict", r["status"])
+pending(K("k-bin"), P("ConstructBin")); wo({"job": "ConstructBin", "amount_total": 1, "material_category": ["wood"]}); n = len(ids("ConstructBin"))
+r = g.order(1, job="ConstructBin", material_category="wood", key=K("k-bin"))
+check("[sim crash] applied+present -> applied, no duplicate", "duplicate suppression", r["status"] == "applied" and len(ids("ConstructBin")) == n, r["status"])
+pending(K("k-blk"), P("ConstructBlocks", cat=None, mat="INORGANIC")); n = len(ids("ConstructBlocks"))
+r1 = g.order(1, job="ConstructBlocks", material="INORGANIC", key=K("k-blk")); r2 = g.order(1, job="ConstructBlocks", material="INORGANIC", key=K("k-blk"))
+check("[sim crash] never applied (counter unchanged) -> retried exactly once, repeat not re-run", "duplicate suppression",
+      r1["status"] == "applied" and r2["status"] == "already_recorded" and len(ids("ConstructBlocks")) - n == 1, (r1["status"], r2["status"]))
+pending(K("k-cab"), P("ConstructCabinet")); wo({"job": "ConstructCabinet", "amount_total": 1, "material_category": ["wood"]})
 for oid in ids("ConstructCabinet"): g.cancel_order(oid)
-na = len(ids("ConstructCabinet")); r = g.order(1, job="ConstructCabinet", material_category="wood", key="ta")
-R["a applied then removed -> unknown, not replayed"] = (r["status"], len(ids("ConstructCabinet")) == na)
-# b. a different-frequency / different-material order must not match
-pending("tb", P("ConstructCoffin")); dfhack.run("workorder", json.dumps({"job": "ConstructCoffin", "amount_total": 1, "material_category": ["wood"], "frequency": "Monthly"}))
-dfhack.run("workorder", json.dumps({"job": "ConstructCoffin", "amount_total": 1, "material": "INORGANIC"}))
-r = g.order(1, job="ConstructCoffin", material_category="wood", key="tb")
-R["b different freq/material not matched -> unknown"] = r["status"]
-# c. two unresolved identical requests, only one order exists -> one applied, the other unknown (never shared)
-pending("tc1", P("ConstructChest")); pending("tc2", P("ConstructChest"))
-dfhack.run("workorder", json.dumps({"job": "ConstructChest", "amount_total": 1, "material_category": ["wood"]}))
-c1 = g.order(1, job="ConstructChest", material_category="wood", key="tc1"); c2 = g.order(1, job="ConstructChest", material_category="wood", key="tc2")
-R["c two unresolved, one order -> applied + unknown"] = (c1["status"], c2["status"])
-# d. branch marker older than our receipts (as after loading an earlier save) -> later receipts stale
+r = g.order(1, job="ConstructCabinet", material_category="wood", key=K("k-cab"))
+check("[sim crash] applied then removed -> unknown, not replayed", "duplicate suppression", r["status"] == "unknown" and not ids("ConstructCabinet"), r["status"])
+
+# --- request attribution ---
+pending(K("k-cof"), P("ConstructCoffin")); wo({"job": "ConstructCoffin", "amount_total": 1, "material_category": ["wood"], "frequency": "Monthly"})
+wo({"job": "ConstructCoffin", "amount_total": 1, "material": "INORGANIC"})
+r = g.order(1, job="ConstructCoffin", material_category="wood", key=K("k-cof"))
+check("different frequency / material orders are not attributed", "request attribution", r["status"] == "unknown", r["status"])
+pending(K("k-iron"), P("ConstructBlocks", cat=None, mat="INORGANIC:IRON")); wo({"job": "ConstructBlocks", "amount_total": 1, "material": "INORGANIC:GRANITE"})
+r = g.order(1, job="ConstructBlocks", material="INORGANIC:IRON", key=K("k-iron"))
+check("same job/amount/frequency, different specific material -> not attributed", "request attribution", r["status"] == "unknown", r["status"])
+for first, second in ((K("k-ch1"), K("k-ch2")), (K("k-ch4"), K("k-ch3"))):
+    pending(K("k-ch1") if first == K("k-ch1") else K("k-ch3"), P("ConstructChest")); pending(K("k-ch2") if first == K("k-ch1") else K("k-ch4"), P("ConstructChest"))
+    wo({"job": "ConstructChest", "amount_total": 1, "material_category": ["wood"]})
+    x = g.order(1, job="ConstructChest", material_category="wood", key=first); y = g.order(1, job="ConstructChest", material_category="wood", key=second)
+    check(f"[sim crash] two indistinguishable pending requests, one order, reconciled {first} first -> both unknown",
+          "request attribution", x["status"] == "unknown" and y["status"] == "unknown", (x["status"], y["status"]))
+    for oid in ids("ConstructChest"): g.cancel_order(oid)
+r = g.order(1, job="ConstructChest", material_category="wood")
+check("new request refused while an identical one is unresolved", "request attribution", r["status"] == "blocked", r["status"])
+
+# --- branch detection ---
 fort, _, _ = g._fort(); token, seq = g.ledger.branch(fort)
 dfhack.lua_json("state.lua", "mark_branch", token, str(max(seq - 3, 0)))
 fort, _, stale = g._fort()
-R["d older branch marker -> receipts stale"] = stale
-for k, v in R.items(): print(f"{k}: {v}")
+check("[sim reload] older save-carried marker -> later receipts stale", "branch detection", stale > 0, stale)
+before = g.ledger.branch(fort)[1]
+a = g.order(1, job="ConstructTable", material_category="wood", key=K("k-mark"))
+after_mark = ident()["branch_seq"]
+check("marker is written after a successful mutation", "branch detection", a["status"] == "applied" and after_mark > before, (before, after_mark))
+
+r = g.settle(K("k-ch1"), "not_applied", "test cleanup"); g.settle(K("k-ch2"), "not_applied", "test cleanup")
+g.settle(K("k-ch3"), "not_applied", "test cleanup"); g.settle(K("k-ch4"), "not_applied", "test cleanup")
+r2 = g.order(1, job="ConstructChest", material_category="wood")
+check("after settling, an identical request is allowed again", "request attribution", r["status"] == "settled" and r2["status"] == "applied", (r["status"], r2["status"]))
+for k in (K("k-cab"), K("k-cof"), K("k-iron")): g.settle(k, "not_applied", "test cleanup")
+failed = [r for r in results if not r[2]]
+for gtee, name, ok, detail in results:
+    print(f"{'PASS' if ok else 'FAIL'}  [{gtee}] {name}  -> {detail}")
 for job in ("ConstructTable", "ConstructDoor", "ConstructBin", "ConstructBlocks", "ConstructCabinet", "ConstructCoffin", "ConstructChest"):
     for oid in ids(job): g.cancel_order(oid)
-print("remaining orders:", [(o["id"], o["job"]) for o in orders()])
+print(f"\n{len(results) - len(failed)}/{len(results)} passed; remaining orders: {[(o['id'], o['job']) for o in orders()]}")
+sys.exit(1 if failed else 0)

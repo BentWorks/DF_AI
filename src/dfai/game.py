@@ -5,6 +5,7 @@ import uuid
 import os
 import shlex
 import shutil
+import threading
 import time
 from pathlib import Path
 from . import config, dfhack
@@ -25,6 +26,7 @@ class Game:
         self.up = Upstream()
         self.ledger = Ledger()
         self._cursor_file = config.RUN_DIR / "event_cursor.json"
+        self._mutex = threading.RLock()   # one mutation (and its recovery) at a time, including checkpoints
         self._ensure_blueprint_link()
 
     # ---------- observation ----------
@@ -152,25 +154,53 @@ class Game:
             ident = dfhack.lua_json("state.lua", "identity")
             return {"orders_before": [o["id"] for o in dfhack.lua_json("state.lua")["orders"]],
                     "next_order_id": ident["next_order_id"]}
+        want_cats = set(m.strip() for m in material_category.split(",")) if material_category else set()
+        want_mat = None
+        if material and material != "INORGANIC":
+            want_mat = dfhack.lua_json("tools.lua", "resolve_material", material)
         def matches(o):
+            """Return True / False, or None when the comparison is unsupported (caller treats as unknown)."""
             if o["job"] != (job or "CustomReaction") or o["total"] != amount or o.get("frequency") != frequency:
                 return False
-            if reaction and o.get("reaction") != reaction:
+            if (o.get("reaction") or None) != (reaction or None):
                 return False
-            if material_category and not set(m.strip() for m in material_category.split(",")) <= set(o.get("material_category") or []):
+            if set(o.get("material_category") or []) != want_cats:
                 return False
-            if material == "INORGANIC" and o.get("mat_type") != 0:
-                return False
-            return True
+            if material == "INORGANIC":
+                return o.get("mat_type") == 0 and o.get("mat_index") == -1
+            if material:
+                if not want_mat or not want_mat.get("ok"):
+                    return None
+                return o.get("mat_type") == want_mat["mat_type"] and o.get("mat_index") == want_mat["mat_index"]
+            return o.get("mat_type") == -1
         def reconcile(prior, fort):
             ev = prior.get("evidence") or {}
             nid = ev.get("next_order_id")
+            dfhack.lua("print(1)")   # RPC is serialized by the game: once this returns, earlier commands have finished
+            # requests that cannot be told apart from this one (same params, overlapping evidence window) -> ambiguous
+            twins = [r for r in self.ledger.open_with_params(fort, "order", prior["params"]) if r["key"] != prior["key"]]
             claimed = self.ledger.claimed_order_ids(fort)
-            hits = sorted((o for o in dfhack.lua_json("state.lua")["orders"]
-                           if nid is not None and o["id"] >= nid and o["id"] not in claimed and matches(o)), key=lambda o: o["id"])
-            if hits:
-                return "applied", {"created_orders": [hits[0]]}
+            cands, unsupported = [], False
+            for o in dfhack.lua_json("state.lua")["orders"]:
+                if nid is None or o["id"] < nid or o["id"] in claimed:
+                    continue
+                m = matches(o)
+                if m is None:
+                    unsupported = True
+                elif m:
+                    cands.append(o)
             now_nid = dfhack.lua_json("state.lua", "identity")["next_order_id"]
+            if unsupported:
+                return "unknown", {"evidence": "material comparison unsupported for this order; cannot attribute"}
+            if twins and (cands or now_nid != nid):
+                return "unknown", {"evidence": f"ambiguous: {len(twins)} other unresolved identical request(s) "
+                                               f"({', '.join(t['key'] for t in twins)}) could account for these orders",
+                                   "candidate_orders": cands}
+            if len(cands) == 1:
+                return "applied", {"created_orders": cands}
+            if len(cands) > 1:
+                return "unknown", {"evidence": "several matching orders; cannot tell which this request created",
+                                   "candidate_orders": cands}
             if nid is not None and now_nid == nid:
                 return "proven_not_applied", {"evidence": "work-order id counter unchanged since the request"}
             return "unknown", {"evidence": f"order ids {nid}..{now_nid - 1} were used since the request but none matches "
@@ -243,6 +273,7 @@ class Game:
         return dfhack.lua_json("tools.lua", "buildings", "zones" if zones else "all")
 
     def checkpoint(self, label: str = "checkpoint", key: str | None = None) -> dict:
+        # holds the same mutex as every mutation, so no server-made save can fall between an action and its marker
         return self._ledgered("checkpoint", {"label": label}, key, lambda: self._checkpoint(label))
 
     def _checkpoint(self, label: str) -> dict:
@@ -267,6 +298,21 @@ class Game:
         dest = config.CHECKPOINT_DIR / f"{_slug(label)}_{tick}"
         shutil.copytree(config.SAVE_DIR / slot, dest, dirs_exist_ok=True)
         return {"ok": True, "slot": slot, "copied_to": str(dest), "seconds": round(time.time() - t0, 1)}
+
+    def settle(self, key: str, outcome: str, note: str) -> dict:
+        """Close an unresolved receipt after inspecting the game: outcome 'applied' or 'not_applied'."""
+        if outcome not in ("applied", "not_applied"):
+            return {"error": "outcome must be 'applied' or 'not_applied'"}
+        with self._mutex:
+            fort, _, _ = self._fort()
+            rec = self.ledger.get(fort, key)
+            if not rec:
+                return {"error": f"no receipt with key {key!r}"}
+            if rec["execution_status"] not in ("requested", "unknown", "stale"):
+                return {"error": f"receipt is already {rec['execution_status']}", "record": rec}
+            self.ledger.finish(fort, key, "applied" if outcome == "applied" else "failed",
+                               {"settled_manually": True, "note": note, "previous": rec["execution_status"], **(rec.get("result") or {})})
+            return {"status": "settled", "key": key, "outcome": outcome}
 
     def action_log(self, limit: int = 20) -> list:
         fort, _, _ = self._fort()
@@ -300,7 +346,11 @@ class Game:
     def _ledgered(self, kind, params, key, fn, evidence_fn=None, reconcile_fn=None):
         """Run a mutation under a durable receipt. `key` is the caller's request identity: omit it for a fresh
         request; reuse it to retry the SAME request. Unresolved attempts are reconciled against game evidence and
-        replayed only when non-application is proven; otherwise they stay 'unknown'."""
+        replayed only when non-application is proven; otherwise they stay 'unknown'. Mutations are serialized."""
+        with self._mutex:
+            return self._ledgered_locked(kind, params, key, fn, evidence_fn, reconcile_fn)
+
+    def _ledgered_locked(self, kind, params, key, fn, evidence_fn, reconcile_fn):
         fort, tick, stale = self._fort()
         canon = json.loads(json.dumps(params, sort_keys=True))
         key = key or f"{kind}:{uuid.uuid4().hex[:12]}"
@@ -322,18 +372,26 @@ class Game:
             if verdict != "proven_not_applied":
                 self.ledger.finish(fort, key, "unknown", {"reconciled": True, **info})
                 return {"status": "unknown", "key": key, **info}
-            # proven not applied: fall through and retry under the same key (history kept)
+        else:
+            # never start a new request that could not be told apart from an unresolved identical one
+            twins = self.ledger.open_with_params(fort, kind, canon)
+            if twins and reconcile_fn:
+                return {"status": "blocked", "key": key,
+                        "error": "an identical earlier request is still unresolved; retry it with its own key first",
+                        "unresolved_keys": [t["key"] for t in twins]}
         evidence = evidence_fn() if evidence_fn else None
         rid = self.ledger.start(fort, key, kind, canon, tick, evidence)
-        try:
-            self._mark(fort, rid)
-        except Exception:
-            pass
         try:
             out = fn()
             status, result = out if isinstance(out, tuple) else (out.get("status") or ("applied" if out.get("ok", True) else "failed"), out)
         except Exception as e:  # leave a durable trace even on crashes
             status, result = "unknown", {"error": f"{type(e).__name__}: {e}"}
+        if status in ("applied", "unknown"):
+            # marker AFTER the mutation: a save taken in between can only make this receipt look stale, never falsely applied
+            try:
+                self._mark(fort, rid)
+            except Exception as e:
+                result = {**(result if isinstance(result, dict) else {"result": result}), "branch_marker_failed": str(e)}
         self.ledger.finish(fort, key, status, result)
         out = {"status": status, "key": key, **(result if isinstance(result, dict) else {"result": result})}
         if stale:

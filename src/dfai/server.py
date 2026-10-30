@@ -36,7 +36,7 @@ Rooms: build a bed, make a bedroom zone around it, then `assign_owner(zone_id, u
 Every mutating tool returns a receipt (status + key) recorded in `action_log`. For anything you might need to retry,
 CHOOSE a `key` yourself before calling (e.g. 'beds-1'), so you can retry after a lost response. Retrying with the
 same key makes the server check the game first; it only repeats the action if it can prove it never happened, and
-otherwise answers 'unknown' - then inspect the game before acting again.
+otherwise answers 'unknown' - then inspect the game and close it with `settle` before sending an identical request.
 A status of 'applied' means the game accepted the change, not that the work is finished: check `observe` later."""
 
 mcp = MCPServer("dfai", instructions=INSTRUCTIONS)
@@ -215,6 +215,15 @@ def set_labor(unit_id: int, labor: str, enabled: bool = True, key: str | None = 
     """Enable/disable one labor for one dwarf (e.g. MINE, CARPENTER, MASON, BREWER, COOK, PLANT, CUTWOOD).
     Labors that belong to a work detail are governed by the detail; use `labor` for those."""
     return _j(game().set_labor(unit_id, labor, enabled, key))
+
+
+@mcp.tool()
+@_safe
+def settle(key: str, outcome: str, note: str) -> str:
+    """Close an 'unknown'/'unresolved'/'stale' receipt once you have checked the game yourself. outcome:
+    'applied' (it did happen) or 'not_applied' (it did not). Your note is recorded. Needed before an identical
+    request can be sent again."""
+    return _j(game().settle(key, outcome, note))
 
 
 def main():

@@ -54,24 +54,49 @@ conda create -p ~/dev/envs/df-ai python=3.11 -y && ~/dev/envs/df-ai/bin/pip inst
 
 Paths default to Snap Steam on Linux. Override them with `DFAI_DFHACK_DIR`, `DFAI_DF_DIR`, `DFAI_SAVE_DIR` and the other variables in `src/dfai/config.py`.
 
-## Guarantees: implemented, tested, open (server v0.4)
+## Guarantees: implemented, tested, open (server v0.5)
 
-These answer AI Collaborator Codex's two reviews of 2026-10-29. "Fault-tested" means [`experiments/g0/test_receipts.py`](../experiments/g0/test_receipts.py) passed against the live tutorial fixture. One fixture is not proof of general reliability.
+These answer AI Collaborator Codex's three reviews of 2026-10-29 and 2026-10-30.
 
-| Guarantee | Implemented | Fault-tested | Open |
+**How the test works.** [`experiments/g0/test_receipts.py`](../experiments/g0/test_receipts.py) asserts each expected outcome and exits non-zero on any failure. It passed 13 of 13 against the live tutorial fixture. Its "crashes" and "reloads" are **simulations inside a live game**: hand-written pending receipts and an injected older branch marker. They are not real process crashes or real save loads. One fixture is not proof of general reliability.
+
+**Assumption.** DFHack RPC commands run one at a time on the game thread. So once a later RPC call returns, any earlier command, including a timed-out one, has finished. Reconciliation sends one such call before it checks the order-ID counter. This hasn't been verified against DFHack's source.
+
+### Duplicate suppression
+
+| Guarantee | Implemented | Tested | Open |
 |---|---|---|---|
-| **One writer.** Agents only use server tools, and `lua` and arbitrary DFHack commands are blocked. | Yes | Partly. A Codex session hit the block. | A formal check that no other writer is attached |
-| **Receipts for every mutating tool,** each accepting a caller-chosen `key`, so a retry can name its request before any response arrives | Yes | Orders | — |
-| **Request identity.** Keyless calls are fresh requests. A key reused with different parameters is a `key_conflict`. | Yes | Yes, tests 1 and 2 | — |
-| **Proved not applied** is kept separate from **no current match.** An order is replayed only if the game's work-order ID counter hasn't moved since the request. If IDs were used but nothing matches, the receipt stays `unknown`. | Yes | Yes, tests 4 and a. A removed order stayed `unknown` and wasn't replayed. | — |
-| **Strict matching.** An order matches only if job, reaction, amount, frequency and material all match. An order claimed by another receipt can't be matched again. | Yes | Yes, tests b and c | — |
-| **Attempt history is kept.** A proven-safe retry reopens the same receipt and records the earlier attempts. | Yes | Yes, test 4 | — |
-| **Reconciliation for kinds other than orders:** build, designate, appoint and others | No. These return `unresolved` with guidance to inspect the game. | — | Evidence-based reconciliation for each kind |
-| **Branch identity.** Each mutation writes a branch marker into the game's persistent site data, so it travels with the save. A loaded save whose marker is older, or from another branch, marks later receipts `stale`. A backward game clock also does. | Yes | Partly. Test d set an older marker in the live game. | **A real UI load of an earlier checkpoint,** both before and after the old tick, including a recorded application missing from the restored state |
-| **Applied, completed and goal met kept separate** (DEC-004) | Partly. `applied` means accepted. | No | Completion tracking and goal predicates |
-| **Appointment legality** follows the game's flags: not `ELECTED`, `ACTIVE`, not military-screen-only, and an appointing post must be held. Candidates must be living adult citizens. | Yes | Partly. Mayor refused, invalid candidate refused. | Role-specific UI rules. Verifying after the screen is closed and reopened. |
-| **Safe replacement.** The candidate is validated before the old holder is removed, with rollback if the write can't be verified. | Yes | Partly. An invalid candidate left the holder untouched. | The rollback path hasn't been triggered yet |
-| **Automation profile.** `advance` closes menus, dismisses popups (returning their text) and restarts a stalled order-check timer, and reports each of these | Yes | Yes | Declaring these as named switches in an evaluation profile |
+| Keyless calls are fresh requests; identical orders can be placed legitimately | Yes | Yes | — |
+| A key reused with different parameters is a `key_conflict` | Yes | Yes | — |
+| Applied but unacknowledged, and still present: reconciled as `applied` with no duplicate | Yes | Simulated | A real process crash |
+| A replay happens only when non-application is **proven**, by the order-ID counter being unchanged. The retry keeps its attempt history. | Yes | Simulated | — |
+| Applied, then removed before reconciliation: stays `unknown` and isn't replayed | Yes | Simulated | — |
+| Reconciliation for build, designate, appoint and the other non-order kinds | No. These return `unresolved`. | — | Evidence-based checks for each kind |
+
+### Request attribution
+
+| Guarantee | Implemented | Tested | Open |
+|---|---|---|---|
+| An order is attributed only if job, reaction, amount, frequency, material category (exact set) and **specific material** (`mat_type`/`mat_index`) all match. An unsupported comparison gives `unknown`. | Yes | Yes. Frequency and category differences, and iron versus granite. | — |
+| Two pending requests that can't be told apart, or several matching orders, stay `unknown` for both, whichever is reconciled first | Yes | Simulated, both orders | — |
+| A new request is refused while an identical one is unresolved. `settle` closes a receipt after a human or agent inspects the game, and records the reason. | Yes | Yes | — |
+| Mutations and checkpoints run one at a time through a single process lock | Yes | No | Other writers (a person playing, game autosaves) aren't covered by the lock |
+
+### Branch detection
+
+| Guarantee | Implemented | Tested | Open |
+|---|---|---|---|
+| A save-carried marker, `{token, seq}` in DFHack persistent site data, is written **after** each successful or uncertain mutation. A save taken in between can only make a receipt look stale, never falsely `applied`. | Yes | Partly. The marker advanced after a mutation. | A save taken between mutation and marker, and an interruption there |
+| A loaded state with an older or foreign marker marks later receipts `stale`. A backward game clock also does. | Yes | Simulated (injected marker) | **Real UI loads** of an earlier checkpoint, before and after the old tick, including an application missing from the restored state |
+| A marker write that fails is reported in the receipt, not swallowed | Yes | No | — |
+
+### Other
+
+| Guarantee | Implemented | Tested | Open |
+|---|---|---|---|
+| Applied, completed and goal met kept separate (DEC-004) | Partly. `applied` means accepted. | No | Completion tracking and goal predicates |
+| Appointment legality uses the game's flags. Replacement validates first, with rollback. | Yes | Partly | UI rules for each role. Checks after the screen is reopened. Triggering the rollback path. |
+| Automation profile: `advance` reports menus closed, popups dismissed and the order timer restarted | Yes | Yes | Named switches in an evaluation profile |
 
 ## Lessons from building it on the live fixture (2026-10-29)
 

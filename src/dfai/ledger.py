@@ -51,6 +51,12 @@ class Ledger:
         self.db.commit()
         return n
 
+    def open_with_params(self, fort, kind, params):
+        canon = json.dumps(params, sort_keys=True)
+        rows = self.db.execute("SELECT * FROM actions WHERE fort=? AND kind=? AND params=? AND execution_status IN "
+                               "('requested','unknown')", (fort, kind, canon)).fetchall()
+        return [self._row(r) for r in rows]
+
     def claimed_order_ids(self, fort):
         ids = set()
         for (res,) in self.db.execute("SELECT result FROM actions WHERE fort=? AND kind='order' AND result IS NOT NULL", (fort,)):

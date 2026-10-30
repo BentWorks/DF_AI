@@ -52,6 +52,9 @@ elseif cmd == 'find_items' then
   table.sort(list, function(a, b) return a.count > b.count end)
   while #list > 40 do table.remove(list) end
   res = {query = q, distinct = #list, matches = list}
+elseif cmd == 'resolve_material' then
+  local mi = dfhack.matinfo.find(args[2] or '')
+  res = mi and {ok = true, mat_type = mi.type, mat_index = mi.index, token = mi:getToken()} or {ok = false, error = 'unknown material ' .. tostring(args[2])}
 elseif cmd == 'job_types' then
   local f = (args[2] or ''):lower()
   local out = {}
