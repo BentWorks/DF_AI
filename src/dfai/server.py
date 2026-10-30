@@ -67,7 +67,7 @@ def _safe(fn):
     return wrapper
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def observe() -> str:
     """Compact fortress overview: date, population, stocks (days of food/drink), alerts, idle dwarves, citizens and
@@ -75,7 +75,7 @@ def observe() -> str:
     return _j(game().state())
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def sensor(name: str, args: dict | None = None) -> str:
     """Detailed read-only reports. Names: fort_status, stocks, threats, unmet_needs, jobs_and_labor, military,
@@ -86,7 +86,7 @@ def sensor(name: str, args: dict | None = None) -> str:
     return _j(game().sensor(name, args))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def advance(ticks: int, max_wall_seconds: float | None = None) -> str:
     """Unpause and let the game run for `ticks` (1200 = one day), then pause. Stops early if the game pauses itself
@@ -94,14 +94,14 @@ def advance(ticks: int, max_wall_seconds: float | None = None) -> str:
     return _j(game().advance(ticks, max_wall_seconds))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def designate(csv: str, x: int, y: int, z: int, mode: str = "dig", key: str | None = None) -> str:
     """Designate digging or zones from a quickfort CSV (mode 'dig' or 'zone'); the CSV's top-left cell goes at x,y,z."""
     return _j(game().designate(csv, x, y, z, mode, key))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def build(csv: str, x: int, y: int, z: int, key: str | None = None) -> str:
     """Place buildings, furniture, stockpiles or zones from a quickfort CSV ('#build', '#place', '#zone' or '#dig'
@@ -110,7 +110,7 @@ def build(csv: str, x: int, y: int, z: int, key: str | None = None) -> str:
     return _j(game().build(csv, x, y, z, key))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def order(amount: int, job: str | None = None, reaction: str | None = None, material_category: str | None = None,
           material: str | None = None, frequency: str = "OneTime", key: str | None = None) -> str:
@@ -121,14 +121,14 @@ def order(amount: int, job: str | None = None, reaction: str | None = None, mate
     return _j(game().order(amount, job, reaction, material_category, material, frequency, key))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def cancel_order(order_id: int, key: str | None = None) -> str:
     """Cancel a manager work order by id (see observe -> orders)."""
     return _j(game().cancel_order(order_id, key))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def appoint(position: str, unit_id: int, replace: bool = False, key: str | None = None) -> str:
     """Appoint a living adult citizen to a noble/administrator position (MANAGER, BROKER, BOOKKEEPER,
@@ -138,14 +138,14 @@ def appoint(position: str, unit_id: int, replace: bool = False, key: str | None 
     return _j(game().appoint(position, unit_id, replace, key))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def positions() -> str:
     """Noble/administrator positions: holders, vacancies, and whether each can be appointed now (and why not)."""
     return _j(game().positions())
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def labor(unit_id: int, detail: str, enabled: bool = True, key: str | None = None) -> str:
     """Add (enabled=true) or remove a citizen from a work detail (e.g. 'Woodworkers', 'Miners', 'Stoneworkers',
@@ -153,7 +153,7 @@ def labor(unit_id: int, detail: str, enabled: bool = True, key: str | None = Non
     return _j(game().labor(unit_id, detail, enabled, key))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def dfhack(command: str, key: str | None = None) -> str:
     """Run an allowed DFHack automation command, e.g. 'enable autochop', 'enable seedwatch', 'seedwatch all 30',
@@ -161,56 +161,56 @@ def dfhack(command: str, key: str | None = None) -> str:
     return _j(game().dfhack_command(command, key))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def checkpoint(label: str = "checkpoint", key: str | None = None) -> str:
     """Save the game (quicksave) and copy the save to the controller's checkpoint store. Takes ~10 seconds."""
     return _j(game().checkpoint(label, key))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def action_log(limit: int = 20) -> str:
     """Recent actions this controller took and their recorded outcomes."""
     return _j(game().action_log(limit))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def remove_building(building_id: int, key: str | None = None) -> str:
     """Mark a building (workshop, furniture) for deconstruction, or remove a zone/stockpile. Ids from `buildings`."""
     return _j(game().remove_building(building_id, key))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def buildings(zones: bool = False) -> str:
     """List buildings (zones=false) or zones (zones=true) with ids, kinds, extents, built state and owners."""
     return _j(game().buildings(zones))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def assign_owner(building_id: int, unit_id: int, key: str | None = None) -> str:
     """Assign a bedroom/office/tomb zone (or a bed) to a citizen; unit_id -1 clears the owner."""
     return _j(game().assign_owner(building_id, unit_id, key))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def find_items(query: str) -> str:
     """Count items whose name or type matches `query` (e.g. 'pick', 'axe', 'barrel', 'log', 'seed', 'bed')."""
     return _j(game().find_items(query))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def job_types(filter: str = "") -> str:
     """List valid job type names for `order`, optionally filtered by substring (e.g. 'Construct', 'barrel')."""
     return _j(game().job_types(filter))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def set_labor(unit_id: int, labor: str, enabled: bool = True, key: str | None = None) -> str:
     """Enable/disable one labor for one dwarf (e.g. MINE, CARPENTER, MASON, BREWER, COOK, PLANT, CUTWOOD).
@@ -218,7 +218,7 @@ def set_labor(unit_id: int, labor: str, enabled: bool = True, key: str | None = 
     return _j(game().set_labor(unit_id, labor, enabled, key))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def settle(key: str, outcome: str, evidence: str, inspected: list | None = None) -> str:
     """Record your judgement on an 'unknown'/'unresolved'/'stale' receipt after checking the game yourself.
@@ -229,7 +229,7 @@ def settle(key: str, outcome: str, evidence: str, inspected: list | None = None)
     return _j(game().settle(key, outcome, evidence, inspected))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def farm_plots() -> str:
     """Farm plots (id, underground or surface, crop per season) and the crops you have seeds for, with the seasons
@@ -237,7 +237,7 @@ def farm_plots() -> str:
     return _j(game().farm_plots())
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def set_crops(plot_id: int, season: str, plant: str, key: str | None = None) -> str:
     """Choose what a farm plot grows: season is spring, summer, autumn, winter or 'all'; plant is a plant id from
@@ -245,7 +245,7 @@ def set_crops(plot_id: int, season: str, plant: str, key: str | None = None) -> 
     return _j(game().set_crops(plot_id, season, plant, key))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def progress(limit: int = 30) -> str:
     """Follow the work orders you placed. Live orders: not_started / waiting / in_progress (done of total) /
@@ -254,7 +254,7 @@ def progress(limit: int = 30) -> str:
     return _j(game().progress(limit))
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def moods() -> str:
     """Strange moods in progress: who, mood type, claimed workshop, and the exact items/materials demanded (read from
@@ -262,7 +262,7 @@ def moods() -> str:
     return _j(game().moods())
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_safe
 def death_history() -> str:
     """Every death of a fort member (or at this site) since the fort was founded, with cause, from the game's
