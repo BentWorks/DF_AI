@@ -31,6 +31,18 @@ The server is the **single writer** (DEC-003). Agents only see its tools.
 | `checkpoint` | Quicksaves, waits for the save to finish, and copies the save to `runs/play/checkpoints/` |
 | `action_log` | Shows recent recorded actions and their outcomes |
 
+## Fair play
+
+The playing AI can only do what a human player could do through the game's own interface. The maintainer raised this on 2026-10-30: "in a normal game play an AI should NOT be able to force a mood."
+
+| Rule | How it's enforced |
+|---|---|
+| **No cheat tools.** | The `dfhack` tool runs only allowlisted helpers. It *also* refuses any command DFHack itself tags `armok`, its label for cheats; 112 tools, read live. That covers `strangemood`, `force`, `createitem`, `dig-now` and similar. |
+| **No seeing what the fort hasn't discovered.** | Observations are fog-of-war honest. Arguments that bypass fog, such as `geology reveal_hidden`, are refused. |
+| **Engine assists are declared and can be switched off.** | One exists today: restarting a stalled order-check timer, which a player can't do directly. It is on by default, reported by `advance` and in checkpoint manifests, and switched off with `DFAI_ENGINE_ASSISTS=0`. |
+| **Some actions are the same as a UI action, done directly.** | Dismissing a popup is the same as clicking OK. Appointments write the same data as the Nobles screen, verified by diff. Single-dwarf labors are reachable in the UI through a custom work detail. Crops, building removal and room assignment all have UI equivalents. |
+| **Test-harness interventions never go through the server.** | Setting up a scenario, such as forcing a mood or an event, is done by the experimenter outside the server. It is recorded as an intervention in the fixture history and the session report. Sessions 3–4 list every such intervention. |
+
 ## Setup
 
 ```sh
