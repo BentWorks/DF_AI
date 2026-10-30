@@ -65,3 +65,13 @@ The AI placed 15 orders. 13 are **finished**, 2 are **in progress**, and the AI 
 | 4 | Empty barrels and pots aren't shown in the overview. Brewing cancelled 34 times for lack of containers. | Wasted production | Add container counts to `observe` |
 | 5 | Built furniture wasn't placed, and 13 adults have no bedroom | Unhappiness | This is gameplay, not tooling. A future prompt can stress it. |
 | 6 | `progress` used absolute ticks while `observe` used ticks within the year | Caused one time-keeping slip | Make both use the same tick and date |
+
+## After the session: fixes in server v0.7, and a test intervention
+
+**Changes:**
+- **Mood demands are now readable.** The root cause of gap 1: in DFHack 53.x a job's `job_items` is a struct wrapping an `elements` vector. A plain loop over it silently returns nothing, which is probably also why dfhack-mcp's `moods` reported `demands: []`. The new `moods` tool, also included in `observe`, reads the demands correctly.
+- **The server keeps its own death list.** `observe` now lists `deaths_since_embark` from the game's unit records and incidents. It shows the gem cutter, with cause `STRUCK_DOWN`, at tick 300,152. This replaces reliance on dfhack-mcp's `fort_status`.
+- **Container counts.** `observe` now shows empty barrels, large pots, bins and bags.
+- **One time scale.** `observe` reports `tick_in_year` and `abs_tick`, and `progress` reports a date and an absolute tick.
+
+**Intervention.** After the session, AI Collaborator Claude ran `strangemood --force --id 8077 --type secretive`, which put the expedition leader Ber into a mood, to test the fix. Ber claimed mason's workshop 7. The demand read back as 3 hard-stone boulders, all of which were already collected. This intervention is part of the fixture's history before any later session.

@@ -7,7 +7,7 @@ INSTRUCTIONS = """You are playing Dwarf Fortress (fortress mode) through DFHack.
 nothing happens until you call `advance`.
 
 A good turn: `observe` -> decide -> act (dig, build, order, appoint, labor) -> `advance` some ticks -> repeat.
-Time: 1 day = 1,200 ticks; 1 month = 33,600; 1 season = 100,800; 1 year = 403,200. About 100 ticks per real second.
+Time: 1 day = 1,200 ticks (observe shows tick_in_year and abs_tick; progress uses dates and abs ticks); 1 month = 33,600; 1 season = 100,800; 1 year = 403,200. About 100 ticks per real second.
 Coordinates are x,y,z map tiles; use `sensor('map_overview')` and `sensor('tile_region', {...})` to see the map
 ('?' = unexplored, '#' = rock, '.' = floor). Blueprints use quickfort CSV (https://docs.dfhack.org/en/stable/docs/guides/quickfort-user-guide.html).
 Multi-tile buildings are placed CENTERED on their key cell.
@@ -251,6 +251,14 @@ def progress(limit: int = 30) -> str:
     """Follow the work orders you placed: not_started / waiting / in_progress (done of total) / finished / cancelled.
     'applied' on an order only meant it was accepted; this shows whether the work actually got done."""
     return _j(game().progress(limit))
+
+
+@mcp.tool()
+@_safe
+def moods() -> str:
+    """Strange moods in progress: who, mood type, claimed workshop, and the exact items/materials demanded (read from
+    the game, including secretive moods) with how many are collected. Unmet moods can end in madness or death."""
+    return _j(game().moods())
 
 
 def main():

@@ -118,6 +118,36 @@ elseif cmd == 'farm_plots' or cmd == 'set_crops' then
         note = (pl and (seeds[pl.id] or 0) == 0) and 'no seeds in stock: nothing will be planted until seeds arrive' or nil}
     end
   end
+elseif cmd == 'moods' then
+  local out = {}
+  for _, u in ipairs(dfhack.units.getCitizens()) do
+    if u.mood ~= -1 then
+      local j = u.job.current_job
+      local demands, ws = {}, nil
+      if j then
+        local jitems = j.job_items
+        local okel, el = pcall(function() return jitems.elements end)   -- DFHack 53.x wraps the vector in a struct
+        if okel and el then jitems = el end
+        for _, ji in ipairs(jitems) do
+          local flags = {}
+          for _, fs in ipairs({ji.flags1, ji.flags2, ji.flags3}) do
+            for k, v in pairs(fs) do if v == true then table.insert(flags, tostring(k)) end end
+          end
+          local mat = (ji.mat_type ~= -1) and dfhack.matinfo.decode(ji.mat_type, ji.mat_index) or nil
+          table.insert(demands, {item_type = ji.item_type ~= -1 and df.item_type[ji.item_type] or 'any',
+            material = mat and mat:getToken() or nil, quantity = ji.quantity, material_flags = flags,
+            reaction_class = (ji.reaction_class ~= '' and ji.reaction_class or nil)})
+        end
+        local b = dfhack.job.getHolder(j)
+        if b then ws = {id = b.id, kind = df.building_type[b:getType()]} end
+      end
+      table.insert(out, {unit_id = u.id, name = dfhack.df2utf(dfhack.units.getReadableName(u)),
+        mood = df.mood_type[u.mood], job = j and df.job_type[j.job_type] or nil, workshop = ws,
+        items_collected = j and #j.items or 0, demands = demands,
+        note = 'gather these materials into stockpiles the dwarf can reach; an unmet mood can end in madness or death'})
+    end
+  end
+  res = {moods = out}
 elseif cmd == 'job_types' then
   local f = (args[2] or ''):lower()
   local out = {}

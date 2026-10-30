@@ -32,7 +32,9 @@ class Game:
     # ---------- observation ----------
     def state(self) -> dict:
         s = dfhack.lua_json("state.lua")
-        out = {"date": s["date"], "tick": s["tick"], "paused": s["paused"], "screen": s["screen"], "popups": s["popups"]}
+        out = {"date": s["date"], "tick_in_year": s["tick"], "abs_tick": s.get("abs_tick"), "paused": s["paused"],
+               "screen": s["screen"], "popups": s["popups"], "deaths_since_embark": s.get("deaths"),
+               "empty_containers": s.get("empty_containers")}
         try:
             fs = self.up.call("fort_status")
             st = self.up.call("stocks")
@@ -49,6 +51,12 @@ class Game:
         out["orders"] = s["orders"]
         pos = dfhack.lua_json("positions.lua", "list")["positions"]
         out["positions"] = {p["code"]: ([h["name"] for h in p["holders"]] or "VACANT") for p in pos}
+        try:
+            moods = dfhack.lua_json("tools.lua", "moods")["moods"]
+            if moods:
+                out["strange_moods"] = moods
+        except Exception as e:
+            out["moods_error"] = str(e)
         out["new_events"] = self.events()["events"]
         try:
             out["my_orders"] = [{k: o[k] for k in ("order_id", "what", "state") if k in o} | ({"done": o["done"], "total": o["total"]} if "done" in o else {})
@@ -348,8 +356,11 @@ class Game:
                     entry = {"state": "finished", "evidence": "one-time order no longer listed and not cancelled by this server "
                                                               "(the game removes one-time orders when complete; a person could also have removed it)"}
                 out.append({"key": key, "order_id": o["id"], "what": prm.get("reaction") or prm.get("job"),
-                            "amount": prm.get("amount"), "placed_at_tick": tick, **entry})
+                            "amount": prm.get("amount"), "placed": _date(tick), "placed_abs_tick": tick, **entry})
         return {"orders": out}
+
+    def moods(self) -> dict:
+        return dfhack.lua_json("tools.lua", "moods")
 
     def farm_plots(self) -> dict:
         return dfhack.lua_json("tools.lua", "farm_plots")
@@ -486,6 +497,17 @@ class Game:
 
     def _save_cursor(self, c):
         self._cursor_file.write_text(json.dumps({"cursor": c}))
+
+
+_MONTHS = ["Granite", "Slate", "Felsite", "Hematite", "Malachite", "Galena", "Limestone", "Sandstone", "Timber",
+           "Moonstone", "Opal", "Obsidian"]
+
+
+def _date(abs_tick):
+    if abs_tick is None:
+        return None
+    year, t = divmod(int(abs_tick), 403200)
+    return f"{t % 33600 // 1200 + 1} {_MONTHS[t // 33600]}, year {year}"
 
 
 def _clean(s: str) -> str:

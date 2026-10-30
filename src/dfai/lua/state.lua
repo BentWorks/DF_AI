@@ -66,7 +66,34 @@ for _, o in ipairs(df.global.world.manager_orders.all) do
     frequency = df.workquota_frequency_type[o.frequency], mat_type = o.mat_type, mat_index = o.mat_index,
     material_category = cats})
 end
+local deaths = {}
+for _, u in ipairs(df.global.world.units.all) do
+  local member = false
+  if dfhack.units.isDead(u) and dfhack.units.isOwnCiv(u) then
+    local hf = df.historical_figure.find(u.hist_figure_id)
+    if hf then for _, l in ipairs(hf.entity_links) do if l.entity_id == df.global.plotinfo.group_id then member = true end end end
+  end
+  if member then
+    local cause, when = nil, nil
+    pcall(function()
+      local inc = df.incident.find(u.counters.death_id)
+      if inc then cause = df.death_type[inc.death_cause]; when = string.format('year %d tick %d', inc.event_year, inc.event_time) end
+    end)
+    table.insert(deaths, {unit_id = u.id, name = clean(dfhack.units.getReadableName(u)), cause = cause, when = when})
+  end
+end
+local function empty(it) return not it.flags.in_job and not it.flags.forbid and not it.flags.rotten and #dfhack.items.getContainedItems(it) == 0 end
+local containers = {barrels = 0, large_pots = 0, bins = 0, bags = 0}
+for _, it in ipairs(df.global.world.items.other.BARREL) do if empty(it) then containers.barrels = containers.barrels + 1 end end
+for _, it in ipairs(df.global.world.items.other.BIN) do if empty(it) then containers.bins = containers.bins + 1 end end
+for _, it in ipairs(df.global.world.items.other.BOX) do if empty(it) then containers.bags = containers.bags + 1 end end
+for _, it in ipairs(df.global.world.items.other.TOOL) do
+  local ok, sub = pcall(function() return it.subtype.id end)
+  if ok and sub == 'ITEM_TOOL_LARGE_POT' and empty(it) then containers.large_pots = containers.large_pots + 1 end
+end
 print(json.encode({
+  deaths = deaths, empty_containers = containers,
+  abs_tick = df.global.cur_year * 403200 + t,
   date = string.format('%d %s, year %d', day, months[month + 1] or '?', df.global.cur_year),
   year = df.global.cur_year, tick = t, paused = dfhack.world.ReadPauseState(),
   screen = dfhack.gui.getCurFocus(true)[1], popups = popups(),
