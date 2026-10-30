@@ -20,3 +20,8 @@ TICKS_PER_SECOND_ESTIMATE = 100   # at the default 100 FPS cap
 
 for d in (RUN_DIR, BLUEPRINT_DIR, CHECKPOINT_DIR):
     d.mkdir(parents=True, exist_ok=True)
+
+# Automatic replay of an order whose earlier attempt is unresolved relies on DFHack running RPC commands one at a
+# time on the game thread (so a later call proves an earlier, possibly timed-out, command has finished). That is not
+# yet verified, so replay is OFF by default: an unchanged order-id counter is reported, but the receipt stays unknown.
+TRUST_RPC_BARRIER = os.environ.get("DFAI_TRUST_RPC_BARRIER", "0") == "1"

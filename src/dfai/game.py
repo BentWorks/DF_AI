@@ -202,7 +202,11 @@ class Game:
                 return "unknown", {"evidence": "several matching orders; cannot tell which this request created",
                                    "candidate_orders": cands}
             if nid is not None and now_nid == nid:
-                return "proven_not_applied", {"evidence": "work-order id counter unchanged since the request"}
+                if config.TRUST_RPC_BARRIER:
+                    return "proven_not_applied", {"evidence": "work-order id counter unchanged since the request"}
+                return "unknown", {"evidence": "work-order id counter unchanged since the request, but automatic replay is "
+                                               "disabled until DFHack RPC ordering is validated (DFAI_TRUST_RPC_BARRIER). "
+                                               "Inspect the game; if you decide to order again, `settle` this receipt first."}
             return "unknown", {"evidence": f"order ids {nid}..{now_nid - 1} were used since the request but none matches "
                                            "an unclaimed current order; it may have been created and already completed or "
                                            "cancelled. Check stocks/observe before ordering again."}
@@ -299,20 +303,32 @@ class Game:
         shutil.copytree(config.SAVE_DIR / slot, dest, dirs_exist_ok=True)
         return {"ok": True, "slot": slot, "copied_to": str(dest), "seconds": round(time.time() - t0, 1)}
 
-    def settle(self, key: str, outcome: str, note: str) -> dict:
-        """Close an unresolved receipt after inspecting the game: outcome 'applied' or 'not_applied'."""
-        if outcome not in ("applied", "not_applied"):
-            return {"error": "outcome must be 'applied' or 'not_applied'"}
+    def settle(self, key: str, outcome: str, evidence: str, inspected: list | None = None) -> dict:
+        """Record an adjudication of an unresolved receipt after inspecting the game.
+        outcome: 'applied' (it happened, even if its result was later removed), 'not_applied' (you have evidence it
+        never happened), or 'abandoned' (still uncertain; you accept duplicate risk for any new identical request).
+        The current branch marker and game tick are recorded with your evidence."""
+        if outcome not in ("applied", "not_applied", "abandoned"):
+            return {"error": "outcome must be 'applied', 'not_applied' or 'abandoned'"}
+        if not evidence or len(evidence.strip()) < 10:
+            return {"error": "describe the evidence you inspected (what you checked and what you saw)"}
         with self._mutex:
-            fort, _, _ = self._fort()
+            fort, tick, _ = self._fort()
             rec = self.ledger.get(fort, key)
             if not rec:
                 return {"error": f"no receipt with key {key!r}"}
             if rec["execution_status"] not in ("requested", "unknown", "stale"):
                 return {"error": f"receipt is already {rec['execution_status']}", "record": rec}
-            self.ledger.finish(fort, key, "applied" if outcome == "applied" else "failed",
-                               {"settled_manually": True, "note": note, "previous": rec["execution_status"], **(rec.get("result") or {})})
-            return {"status": "settled", "key": key, "outcome": outcome}
+            ident = dfhack.lua_json("state.lua", "identity")
+            status = {"applied": "applied", "not_applied": "failed", "abandoned": "abandoned"}[outcome]
+            self.ledger.finish(fort, key, status, {
+                "adjudication": {"outcome": outcome, "evidence": evidence, "inspected": inspected or [],
+                                 "game_tick": tick, "branch": [ident.get("branch_token"), ident.get("branch_seq")]},
+                "previous": rec["execution_status"], **(rec.get("result") or {})})
+            out = {"status": "settled", "key": key, "outcome": outcome}
+            if outcome == "abandoned":
+                out["warning"] = "uncertainty was not resolved; a new identical request may duplicate the original"
+            return out
 
     def action_log(self, limit: int = 20) -> list:
         fort, _, _ = self._fort()

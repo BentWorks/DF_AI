@@ -35,9 +35,18 @@ check("same key + different params -> key_conflict", "duplicate suppression", r[
 pending(K("k-bin"), P("ConstructBin")); wo({"job": "ConstructBin", "amount_total": 1, "material_category": ["wood"]}); n = len(ids("ConstructBin"))
 r = g.order(1, job="ConstructBin", material_category="wood", key=K("k-bin"))
 check("[sim crash] applied+present -> applied, no duplicate", "duplicate suppression", r["status"] == "applied" and len(ids("ConstructBin")) == n, r["status"])
+from dfai import config
+pending(K("k-blk0"), P("ConstructBlocks", cat=None, mat="INORGANIC")); n = len(ids("ConstructBlocks"))
+config.TRUST_RPC_BARRIER = False
+r0 = g.order(1, job="ConstructBlocks", material="INORGANIC", key=K("k-blk0"))
+check("[sim crash] counter unchanged, barrier unverified (default) -> unknown, no replay", "duplicate suppression",
+      r0["status"] == "unknown" and len(ids("ConstructBlocks")) == n, r0["status"])
+g.settle(K("k-blk0"), "abandoned", "test: simulated pending receipt with no dispatch; closing as abandoned")
+config.TRUST_RPC_BARRIER = True
 pending(K("k-blk"), P("ConstructBlocks", cat=None, mat="INORGANIC")); n = len(ids("ConstructBlocks"))
 r1 = g.order(1, job="ConstructBlocks", material="INORGANIC", key=K("k-blk")); r2 = g.order(1, job="ConstructBlocks", material="INORGANIC", key=K("k-blk"))
-check("[sim crash] never applied (counter unchanged) -> retried exactly once, repeat not re-run", "duplicate suppression",
+config.TRUST_RPC_BARRIER = False
+check("[sim crash, barrier trusted] counter unchanged -> retried exactly once, repeat not re-run", "duplicate suppression",
       r1["status"] == "applied" and r2["status"] == "already_recorded" and len(ids("ConstructBlocks")) - n == 1, (r1["status"], r2["status"]))
 pending(K("k-cab"), P("ConstructCabinet")); wo({"job": "ConstructCabinet", "amount_total": 1, "material_category": ["wood"]})
 for oid in ids("ConstructCabinet"): g.cancel_order(oid)
@@ -72,11 +81,15 @@ a = g.order(1, job="ConstructTable", material_category="wood", key=K("k-mark"))
 after_mark = ident()["branch_seq"]
 check("marker is written after a successful mutation", "branch detection", a["status"] == "applied" and after_mark > before, (before, after_mark))
 
-r = g.settle(K("k-ch1"), "not_applied", "test cleanup"); g.settle(K("k-ch2"), "not_applied", "test cleanup")
-g.settle(K("k-ch3"), "not_applied", "test cleanup"); g.settle(K("k-ch4"), "not_applied", "test cleanup")
+ev = "test: ambiguous simulated pair; one order observed and cancelled; attribution unknown"
+r = g.settle(K("k-ch1"), "abandoned", ev, ["ConstructChest orders"]); g.settle(K("k-ch2"), "abandoned", ev)
+g.settle(K("k-ch3"), "abandoned", ev); g.settle(K("k-ch4"), "abandoned", ev)
+bad = g.settle(K("k-cof"), "not_applied", "short")
+check("settle refuses an adjudication without real evidence", "request attribution", "error" in bad, bad.get("error"))
 r2 = g.order(1, job="ConstructChest", material_category="wood")
 check("after settling, an identical request is allowed again", "request attribution", r["status"] == "settled" and r2["status"] == "applied", (r["status"], r2["status"]))
-for k in (K("k-cab"), K("k-cof"), K("k-iron")): g.settle(k, "not_applied", "test cleanup")
+g.settle(K("k-cab"), "applied", "test: the order was dispatched and later cancelled, so it did apply", ["ConstructCabinet order"])
+for k in (K("k-cof"), K("k-iron")): g.settle(k, "abandoned", "test: non-matching orders present; attribution unknown")
 failed = [r for r in results if not r[2]]
 for gtee, name, ok, detail in results:
     print(f"{'PASS' if ok else 'FAIL'}  [{gtee}] {name}  -> {detail}")

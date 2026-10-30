@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS actions (
   key TEXT NOT NULL,               -- request identity (caller-supplied or generated)
   kind TEXT NOT NULL,
   params TEXT NOT NULL,
-  execution_status TEXT NOT NULL,  -- requested | applied | blocked | failed | unknown | stale
+  execution_status TEXT NOT NULL,  -- requested | applied | blocked | failed | unknown | stale | abandoned
   evidence TEXT,                   -- pre-action evidence used for reconciliation
   result TEXT,
   game_tick INTEGER,

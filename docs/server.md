@@ -54,11 +54,11 @@ conda create -p ~/dev/envs/df-ai python=3.11 -y && ~/dev/envs/df-ai/bin/pip inst
 
 Paths default to Snap Steam on Linux. Override them with `DFAI_DFHACK_DIR`, `DFAI_DF_DIR`, `DFAI_SAVE_DIR` and the other variables in `src/dfai/config.py`.
 
-## Guarantees: implemented, tested, open (server v0.5)
+## Guarantees: implemented, tested, open (server v0.5.1)
 
 These answer AI Collaborator Codex's three reviews of 2026-10-29 and 2026-10-30.
 
-**How the test works.** [`experiments/g0/test_receipts.py`](../experiments/g0/test_receipts.py) asserts each expected outcome and exits non-zero on any failure. It passed 13 of 13 against the live tutorial fixture. Its "crashes" and "reloads" are **simulations inside a live game**: hand-written pending receipts and an injected older branch marker. They are not real process crashes or real save loads. One fixture is not proof of general reliability.
+**How the test works.** [`experiments/g0/test_receipts.py`](../experiments/g0/test_receipts.py) asserts each expected outcome and exits non-zero on any failure. It passed 15 of 15 against the live tutorial fixture. Its "crashes" and "reloads" are **simulations inside a live game**: hand-written pending receipts and an injected older branch marker. They are not real process crashes or real save loads. One fixture is not proof of general reliability.
 
 **Assumption.** DFHack RPC commands run one at a time on the game thread. So once a later RPC call returns, any earlier command, including a timed-out one, has finished. Reconciliation sends one such call before it checks the order-ID counter. This hasn't been verified against DFHack's source.
 
@@ -69,7 +69,7 @@ These answer AI Collaborator Codex's three reviews of 2026-10-29 and 2026-10-30.
 | Keyless calls are fresh requests; identical orders can be placed legitimately | Yes | Yes | — |
 | A key reused with different parameters is a `key_conflict` | Yes | Yes | — |
 | Applied but unacknowledged, and still present: reconciled as `applied` with no duplicate | Yes | Simulated | A real process crash |
-| A replay happens only when non-application is **proven**, by the order-ID counter being unchanged. The retry keeps its attempt history. | Yes | Simulated | — |
+| **Automatic replay is off by default.** An unchanged order-ID counter is reported, but the receipt stays `unknown` until the RPC-ordering assumption is checked. With `DFAI_TRUST_RPC_BARRIER=1`, an unchanged counter allows one replay, and the attempt history is kept. | Yes | Simulated, both settings | Checking the RPC ordering against DFHack, which would let replay be switched on |
 | Applied, then removed before reconciliation: stays `unknown` and isn't replayed | Yes | Simulated | — |
 | Reconciliation for build, designate, appoint and the other non-order kinds | No. These return `unresolved`. | — | Evidence-based checks for each kind |
 
@@ -79,7 +79,7 @@ These answer AI Collaborator Codex's three reviews of 2026-10-29 and 2026-10-30.
 |---|---|---|---|
 | An order is attributed only if job, reaction, amount, frequency, material category (exact set) and **specific material** (`mat_type`/`mat_index`) all match. An unsupported comparison gives `unknown`. | Yes | Yes. Frequency and category differences, and iron versus granite. | — |
 | Two pending requests that can't be told apart, or several matching orders, stay `unknown` for both, whichever is reconciled first | Yes | Simulated, both orders | — |
-| A new request is refused while an identical one is unresolved. `settle` closes a receipt after a human or agent inspects the game, and records the reason. | Yes | Yes | — |
+| A new request is refused while an identical one is unresolved. `settle` records an **adjudication**: the outcome is `applied` (it happened, even if later removed), `not_applied` (backed by evidence) or `abandoned` (still uncertain, duplicate risk accepted). It records the evidence, the items inspected, the tick and the branch. Evidence is required. | Yes | Yes | — |
 | Mutations and checkpoints run one at a time through a single process lock | Yes | No | Other writers (a person playing, game autosaves) aren't covered by the lock |
 
 ### Branch detection

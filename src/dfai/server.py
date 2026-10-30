@@ -36,7 +36,8 @@ Rooms: build a bed, make a bedroom zone around it, then `assign_owner(zone_id, u
 Every mutating tool returns a receipt (status + key) recorded in `action_log`. For anything you might need to retry,
 CHOOSE a `key` yourself before calling (e.g. 'beds-1'), so you can retry after a lost response. Retrying with the
 same key makes the server check the game first; it only repeats the action if it can prove it never happened, and
-otherwise answers 'unknown' - then inspect the game and close it with `settle` before sending an identical request.
+otherwise answers 'unknown' - then STOP that line of work, inspect the game, and record your judgement with `settle`
+(applied / not_applied / abandoned) before sending an identical request.
 A status of 'applied' means the game accepted the change, not that the work is finished: check `observe` later."""
 
 mcp = MCPServer("dfai", instructions=INSTRUCTIONS)
@@ -219,11 +220,13 @@ def set_labor(unit_id: int, labor: str, enabled: bool = True, key: str | None = 
 
 @mcp.tool()
 @_safe
-def settle(key: str, outcome: str, note: str) -> str:
-    """Close an 'unknown'/'unresolved'/'stale' receipt once you have checked the game yourself. outcome:
-    'applied' (it did happen) or 'not_applied' (it did not). Your note is recorded. Needed before an identical
-    request can be sent again."""
-    return _j(game().settle(key, outcome, note))
+def settle(key: str, outcome: str, evidence: str, inspected: list | None = None) -> str:
+    """Record your judgement on an 'unknown'/'unresolved'/'stale' receipt after checking the game yourself.
+    outcome: 'applied' (it happened - even if later removed), 'not_applied' (you have evidence it never happened),
+    or 'abandoned' (still uncertain; you accept that a new identical request might duplicate it).
+    `evidence`: what you checked and what you saw. `inspected`: ids/names of orders, buildings or items you looked at.
+    Required before an identical request can be sent again."""
+    return _j(game().settle(key, outcome, evidence, inspected))
 
 
 def main():
