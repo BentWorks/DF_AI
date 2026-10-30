@@ -1,5 +1,7 @@
 # Play session 1: Claude, headless (2026-10-29)
 
+> **Policy in effect:** this ran *before* the fair-play policy (commit `dec84da`). The server's allowlist already excluded cheat commands, but there was no `armok` refusal and no fog-bypass refusal yet. The transcript shows the playing agent used neither. The order-timer restart engine assist was always on.
+
 - **Client:** `claude -p` (Claude Code, default model), `--strict-mcp-config --mcp-config .mcp.json --allowedTools "mcp__dfai__*"`.
 - **Prompt:** [runs/play/session1_prompt.md](../../runs/play/session1_prompt.md), which is not committed. It gave Claude about two in-game weeks to move the tutorial fort toward self-sufficiency, keep everyone alive, and finish with a report.
 - **Server:** the first version, with 12 tools. The transcript is `runs/play/sessions/claude-20261029-165636.jsonl`, kept locally.
