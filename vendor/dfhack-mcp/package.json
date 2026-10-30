@@ -1,0 +1,6 @@
+{
+  "name": "dfai-vendor-dfhack-mcp",
+  "private": true,
+  "description": "Pinned dfhack-mcp used by the DF_AI game server (node_modules is gitignored; run npm ci --ignore-scripts).",
+  "dependencies": { "dfhack-mcp": "1.4.1" }
+}

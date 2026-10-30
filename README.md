@@ -2,7 +2,7 @@
 
 Exploring AI-controlled Dwarf Fortress with a controller that can work with different models and agent harnesses: Claude, Codex, Gemini, local models, or a custom runner.
 
-**Status: concept and research.** This repository contains design documents, not a working implementation. No Dwarf Fortress/DFHack version pair or agent integration has been validated by this project. Code snippets in the documents are sketches, not an installation guide.
+**Status: early playable prototype.** The DF_AI game server in `src/dfai` ([docs/server.md](docs/server.md)) lets an MCP-capable AI play a running fort. Validation of the wider plan continues. It is pinned to DF v0.53.16 with DFHack 53.16-r3 on Linux. Code snippets in the older design documents are sketches; the server docs are the installation guide.
 
 The initial target is fortress mode on Linux, starting from a prepared save. The proposed approach uses structured game state and actions through DFHack. Models would choose goals and priorities; ordinary code would validate plans, execute actions, and handle time-sensitive conditions.
 

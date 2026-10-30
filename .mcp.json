@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "dfai": {
+      "type": "stdio",
+      "command": "./dfai-server.sh",
+      "args": []
+    }
+  }
+}
