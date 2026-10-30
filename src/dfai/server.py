@@ -248,8 +248,9 @@ def set_crops(plot_id: int, season: str, plant: str, key: str | None = None) -> 
 @mcp.tool()
 @_safe
 def progress(limit: int = 30) -> str:
-    """Follow the work orders you placed: not_started / waiting / in_progress (done of total) / finished / cancelled.
-    'applied' on an order only meant it was accepted; this shows whether the work actually got done."""
+    """Follow the work orders you placed. Live orders: not_started / waiting / in_progress (done of total) /
+    recurring (current cycle). Gone orders: completed_announced (a matching game completion report exists),
+    completion_unconfirmed (gone, but no report found - do not assume it was done), or cancelled."""
     return _j(game().progress(limit))
 
 
@@ -259,6 +260,14 @@ def moods() -> str:
     """Strange moods in progress: who, mood type, claimed workshop, and the exact items/materials demanded (read from
     the game, including secretive moods) with how many are collected. Unmet moods can end in madness or death."""
     return _j(game().moods())
+
+
+@mcp.tool()
+@_safe
+def death_history() -> str:
+    """Every death of a fort member (or at this site) since the fort was founded, with cause, from the game's
+    permanent world history; includes a count of starvation/dehydration deaths and the coverage window."""
+    return _j(game().death_history())
 
 
 def main():

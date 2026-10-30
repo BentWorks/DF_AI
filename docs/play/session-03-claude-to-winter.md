@@ -33,27 +33,40 @@
 | Wall time | 33.6 minutes. The AI's own total of advance time was about 43 minutes. |
 | Cost reported by Claude Code | US$1.84 |
 
+### Death history: source and coverage (revised for v0.8)
+
+- **Source.** The game's world history: HIST_FIGURE_DIED events, which are kept permanently. Every citizen is a historical figure.
+- **Coverage.** From the fort's founding event, year 100 tick 0, to the end of the session.
+- **What it shows.** One death of a fort member: the gem cutter, `STRUCK_DOWN`. There were **0** starvation or dehydration deaths.
+- **Gaps.** Units that aren't historical figures. Dwarves who died before becoming members.
+
 ### Against the G1 predicate
 
 The G1 predicate is: at the first tick of winter, at least seven citizens alive and no starvation or dehydration deaths since embark.
 
 - **Citizens alive:** 24, so this is met.
-- **Starvation and dehydration deaths:** none on record. The single death came from violence.
+- **Starvation and dehydration deaths:** none, with world-history coverage from the fort's founding (see above). The single death came from violence. The game had other events before this session (sessions 1 and 2, and hand probes), but the death record covers them.
 - **But this is not a G1 pass.** R2 defines G1 as following a fixed-profile unattended startup. This fort is a continuing tutorial save, with earlier sessions and hand probes in its history.
 - **The AI's own, stricter goal of "every dwarf alive" was not met.**
 
 ## Requested vs completed work
 
-The AI placed 15 orders. 13 are **finished**, 2 are **in progress**, and the AI cancelled none.
+The AI placed 15 orders and cancelled none. Its report said "13 finished", which overstated the evidence. Server v0.8's `progress` grades each order by confidence:
 
-- **What "finished" means here.** For one-time orders, finished is an inference: the order left the game's list and wasn't cancelled through the server. For tables and chairs the game also reported "has been completed".
-- **The two in progress:** a monthly brew order at 6 of 10, and a barrel order at 1 of 10.
+| State | Orders | Basis |
+|---|---|---|
+| completed_announced | 8: beds ×4, beds ×6, tables ×5, chairs ×5, barrels ×6, barrels ×8, brew ×5, brew ×10 | The order is gone, and a matching game report says it "has been completed" after the order was placed. The match uses the report's text and amount, so it is heuristic. |
+| completion_unconfirmed | 5: meals ×10 three times, barrels ×5 twice | The order is gone and wasn't cancelled, but no matching report was found. Reports come from a rolling window and can be pruned. |
+| in_progress | 1: barrels ×10 | Read from the live order |
+| recurring | 1: monthly brew ×10 | Current cycle 0 of 10, with 1 cycle announced |
+
+These counts were measured after the session, so a few more game days had passed.
 
 **Production chain followed to completion: plump helmets to drink.**
 1. **Planting.** The AI set two plots to grow plump helmets in all seasons with `set_crops`, and built a third plot.
 2. **Harvest.** When it came in, brew orders that had been cancelling with "Needs unrotten fermentable plant" began to run.
 3. **Completion.** `brew-5-a` finished, with the game report "Brew drink from plant (5) has been completed". `brew-10-b` followed.
-4. **Result.** Drink rose from 122 to 226 while the population tripled.
+4. **Result.** Drink rose from 122 to 226 while the population tripled. The completion reports confirm that these brew orders finished. They don't show that every unit of drink came from them.
 
 ## Gaps found, in priority order
 

@@ -148,6 +148,42 @@ elseif cmd == 'moods' then
     end
   end
   res = {moods = out}
+elseif cmd == 'death_history' then
+  -- Source: world history HIST_FIGURE_DIED events (persistent; every citizen is a historical figure).
+  local site, gid = df.global.plotinfo.site_id, df.global.plotinfo.group_id
+  local founded_year, founded_tick
+  for _, e in ipairs(df.global.world.history.events) do
+    if df.history_event_created_sitest:is_instance(e) and e.site == site then founded_year, founded_tick = e.year, e.seconds end
+  end
+  local deaths, by_cause = {}, {}
+  local ev = df.global.world.history.events
+  for i = #ev - 1, 0, -1 do
+    local e = ev[i]
+    if founded_year and e.year < founded_year then break end
+    if df.history_event_hist_figure_diedst:is_instance(e) and (not founded_year or e.year > founded_year or e.seconds >= (founded_tick or 0)) then
+      local hf = df.historical_figure.find(e.victim_hf)
+      local member = false
+      if hf then for _, l in ipairs(hf.entity_links) do if l.entity_id == gid then member = true end end end
+      if member or e.site == site then
+        local cause = df.death_type[e.death_cause] or tostring(e.death_cause)
+        by_cause[cause] = (by_cause[cause] or 0) + 1
+        table.insert(deaths, {name = hf and dfhack.df2utf(dfhack.translation.translateName(hf.name, false)) or '?', member = member,
+          at_this_site = e.site == site, cause = cause, year = e.year, tick = e.seconds})
+      end
+    end
+  end
+  res = {source = 'world history HIST_FIGURE_DIED events', coverage_from = founded_year and {year = founded_year, tick = founded_tick} or 'unknown (no site-founding event found)',
+    deaths = deaths, by_cause = by_cause,
+    starvation_or_dehydration = (by_cause.HUNGER or 0) + (by_cause.THIRST or 0),
+    gaps = 'non-historical units are not covered; members are dwarves ever linked to this fort government'}
+elseif cmd == 'quota_reports' then
+  local out = {}
+  for _, r in ipairs(df.global.world.status.reports) do
+    if r.type == df.announcement_type.QUOTA_FILLED then
+      table.insert(out, {id = r.id, abs_tick = r.year * 403200 + r.time, text = dfhack.df2utf(r.text)})
+    end
+  end
+  res = {reports = out, note = 'from the rolling report window; old reports can be pruned'}
 elseif cmd == 'job_types' then
   local f = (args[2] or ''):lower()
   local out = {}

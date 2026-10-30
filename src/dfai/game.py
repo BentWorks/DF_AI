@@ -33,7 +33,7 @@ class Game:
     def state(self) -> dict:
         s = dfhack.lua_json("state.lua")
         out = {"date": s["date"], "tick_in_year": s["tick"], "abs_tick": s.get("abs_tick"), "paused": s["paused"],
-               "screen": s["screen"], "popups": s["popups"], "deaths_since_embark": s.get("deaths"),
+               "screen": s["screen"], "popups": s["popups"], "dead_citizen_units": s.get("deaths"),
                "empty_containers": s.get("empty_containers")}
         try:
             fs = self.up.call("fort_status")
@@ -333,31 +333,51 @@ class Game:
         return {"ok": True, "slot": slot, "copied_to": str(dest), "seconds": round(time.time() - t0, 1)}
 
     def progress(self, limit: int = 30) -> dict:
-        """Follow every order this server placed: in progress (with amount left), finished, or cancelled."""
+        """Follow every order this server placed. States, by confidence:
+        not_started / waiting / in_progress (read from the live order), recurring (live repeating order, current cycle),
+        completed_announced (order gone AND a matching game 'has been completed' report after it was placed),
+        completion_unconfirmed (order gone, not cancelled by this server, no matching report found), cancelled."""
         fort, _, _ = self._fort()
         current = {o["id"]: o for o in dfhack.lua_json("state.lua")["orders"]}
+        quota = dfhack.lua_json("tools.lua", "quota_reports")["reports"]
+        used_reports = set()
         cancelled = {}
         for r in self.ledger.db.execute("SELECT params, execution_status FROM actions WHERE fort=? AND kind='cancel_order'", (fort,)):
             if r[1] == "applied":
                 cancelled[json.loads(r[0]).get("order_id")] = True
         out = []
         rows = self.ledger.db.execute("SELECT key, params, result, game_tick FROM actions WHERE fort=? AND kind='order' AND "
-                                      "execution_status='applied' ORDER BY id DESC LIMIT ?", (fort, limit)).fetchall()
+                                      "execution_status='applied' ORDER BY id ASC", (fort,)).fetchall()[-limit:]
         for key, params, result, tick in rows:
             res, prm = json.loads(result or "{}"), json.loads(params)
             for o in res.get("created_orders", []):
                 cur = current.get(o["id"])
-                if cur:
+                if cur and (cur.get("frequency") or "OneTime") != "OneTime":
+                    entry = {"state": "recurring", "frequency": cur.get("frequency"),
+                             "this_cycle_done": cur["total"] - cur["left"], "total": cur["total"],
+                             "cycles_announced": len([q for q in quota if q["abs_tick"] >= (tick or 0) and _report_matches(q["text"], prm)])}
+                elif cur:
                     state = "in_progress" if cur["left"] < cur["total"] else ("waiting" if cur.get("active") else "not_started")
                     entry = {"state": state, "done": cur["total"] - cur["left"], "total": cur["total"], "active": cur.get("active")}
                 elif o["id"] in cancelled:
                     entry = {"state": "cancelled"}
                 else:
-                    entry = {"state": "finished", "evidence": "one-time order no longer listed and not cancelled by this server "
-                                                              "(the game removes one-time orders when complete; a person could also have removed it)"}
+                    hit = next((q for q in quota if q["id"] not in used_reports and q["abs_tick"] >= (tick or 0)
+                                and _report_matches(q["text"], prm)), None)
+                    if hit:
+                        used_reports.add(hit["id"])
+                        entry = {"state": "completed_announced", "evidence": hit["text"], "match_basis": "report text and amount (heuristic)"}
+                    else:
+                        entry = {"state": "completion_unconfirmed",
+                                 "evidence": "order no longer listed and not cancelled by this server; no matching completion "
+                                             "report found (reports can be pruned, or a person may have removed it)"}
                 out.append({"key": key, "order_id": o["id"], "what": prm.get("reaction") or prm.get("job"),
                             "amount": prm.get("amount"), "placed": _date(tick), "placed_abs_tick": tick, **entry})
+        out.reverse()
         return {"orders": out}
+
+    def death_history(self) -> dict:
+        return dfhack.lua_json("tools.lua", "death_history")
 
     def moods(self) -> dict:
         return dfhack.lua_json("tools.lua", "moods")
@@ -508,6 +528,22 @@ def _date(abs_tick):
         return None
     year, t = divmod(int(abs_tick), 403200)
     return f"{t % 33600 // 1200 + 1} {_MONTHS[t // 33600]}, year {year}"
+
+
+_JOB_WORDS = {"ConstructThrone": ["chair", "throne"], "PrepareMeal": ["meal"], "MakeBarrel": ["barrel"]}
+
+
+def _report_matches(text: str, params: dict) -> bool:
+    """Heuristic: a QUOTA_FILLED report like 'Make wooden table (5) has been completed.' for this order."""
+    import re
+    t = text.lower()
+    if f"({params.get('amount')})" not in t:
+        return False
+    if params.get("reaction"):
+        return params["reaction"].split("_")[0].lower() in t
+    job = params.get("job") or ""
+    words = _JOB_WORDS.get(job) or [w.lower() for w in re.findall(r"[A-Z][a-z]+", job) if w not in ("Construct", "Make", "Prepare")]
+    return any(w in t for w in words)
 
 
 def _clean(s: str) -> str:
