@@ -229,6 +229,30 @@ def settle(key: str, outcome: str, evidence: str, inspected: list | None = None)
     return _j(game().settle(key, outcome, evidence, inspected))
 
 
+@mcp.tool()
+@_safe
+def farm_plots() -> str:
+    """Farm plots (id, underground or surface, crop per season) and the crops you have seeds for, with the seasons
+    they grow in, whether they grow underground or on the surface, and whether they can be brewed."""
+    return _j(game().farm_plots())
+
+
+@mcp.tool()
+@_safe
+def set_crops(plot_id: int, season: str, plant: str, key: str | None = None) -> str:
+    """Choose what a farm plot grows: season is spring, summer, autumn, winter or 'all'; plant is a plant id from
+    `farm_plots` (e.g. MUSHROOM_HELMET_PLUMP) or 'fallow'. Checks the plant grows in that season and location."""
+    return _j(game().set_crops(plot_id, season, plant, key))
+
+
+@mcp.tool()
+@_safe
+def progress(limit: int = 30) -> str:
+    """Follow the work orders you placed: not_started / waiting / in_progress (done of total) / finished / cancelled.
+    'applied' on an order only meant it was accepted; this shows whether the work actually got done."""
+    return _j(game().progress(limit))
+
+
 def main():
     mcp.run("stdio")
 

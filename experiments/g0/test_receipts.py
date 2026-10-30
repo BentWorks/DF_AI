@@ -3,7 +3,8 @@ SIMULATION NOTE: "crashes" are simulated by writing a 'requested' receipt with p
 (optionally) dispatching the order outside the ledger; "reloads" are simulated by writing an older branch marker
 into the live game. Neither is a real process crash or a real save load.
 Run: PYTHONPATH=src ~/dev/envs/df-ai/bin/python experiments/g0/test_receipts.py"""
-import json, sys
+import json, os, sys
+os.environ.setdefault("DFAI_RUN_DIR", os.path.join(os.path.dirname(__file__), "../../runs/test"))   # keep test receipts out of play records
 from dfai.game import Game
 from dfai import dfhack
 

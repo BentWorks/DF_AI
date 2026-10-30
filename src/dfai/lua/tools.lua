@@ -55,6 +55,69 @@ elseif cmd == 'find_items' then
 elseif cmd == 'resolve_material' then
   local mi = dfhack.matinfo.find(args[2] or '')
   res = mi and {ok = true, mat_type = mi.type, mat_index = mi.index, token = mi:getToken()} or {ok = false, error = 'unknown material ' .. tostring(args[2])}
+elseif cmd == 'farm_plots' or cmd == 'set_crops' then
+  local SEASONS = {'spring', 'summer', 'autumn', 'winter'}
+  local SFLAG = {spring = 'SPRING', summer = 'SUMMER', autumn = 'AUTUMN', winter = 'WINTER'}
+  local function seeds_by_plant()
+    local c = {}
+    for _, it in ipairs(df.global.world.items.other.SEEDS) do
+      if not it.flags.forbid and not it.flags.rotten then
+        local mi = dfhack.matinfo.decode(it)
+        if mi and mi.plant then c[mi.plant.id] = (c[mi.plant.id] or 0) + it.stack_size end
+      end
+    end
+    return c
+  end
+  local function underground(b) return dfhack.maps.getTileFlags(b.x1, b.y1, b.z).subterranean end
+  local function grows_here(pl, under)
+    local sub = pl.flags.BIOME_SUBTERRANEAN_WATER or pl.flags.BIOME_SUBTERRANEAN_CHASM or pl.flags.BIOME_SUBTERRANEAN_LAVA
+    if under then return sub and true or false end
+    for k, v in pairs(pl.flags) do if v == true and tostring(k):find('^BIOME_') and not tostring(k):find('SUBTERRANEAN') then return true end end
+    return false
+  end
+  local seeds = seeds_by_plant()
+  if cmd == 'farm_plots' then
+    local out = {}
+    for _, b in ipairs(df.global.world.buildings.other.FARM_PLOT) do
+      local crops = {}
+      for i = 0, 3 do local id = b.plant_id[i]; crops[SEASONS[i + 1]] = id >= 0 and df.global.world.raws.plants.all[id].id or 'fallow' end
+      table.insert(out, {id = b.id, x1 = b.x1, y1 = b.y1, x2 = b.x2, y2 = b.y2, z = b.z, underground = underground(b),
+        built = b:getBuildStage() >= b:getMaxBuildStage(), crops = crops})
+    end
+    local plantable = {}
+    for _, pl in ipairs(df.global.world.raws.plants.all) do
+      if pl.flags.SEED and (seeds[pl.id] or 0) > 0 then
+        local ss = {}
+        for _, s in ipairs(SEASONS) do if pl.flags[SFLAG[s]] then table.insert(ss, s) end end
+        table.insert(plantable, {plant = pl.id, name = pl.name, seeds = seeds[pl.id], seasons = ss,
+          underground = grows_here(pl, true), surface = grows_here(pl, false), brewable = pl.flags.DRINK or false})
+      end
+    end
+    res = {season_now = SEASONS[df.global.cur_season + 1], plots = out, plants_with_seeds = plantable}
+  else
+    local b = df.building.find(tonumber(args[2] or ''))
+    local season, token = (args[3] or ''):lower(), args[4] or ''
+    local pl
+    for _, p in ipairs(df.global.world.raws.plants.all) do if p.id == token then pl = p end end
+    if not b or b:getType() ~= df.building_type.FarmPlot then res = {ok = false, error = 'no farm plot with id ' .. tostring(args[2])}
+    elseif token ~= 'fallow' and not pl then res = {ok = false, error = 'unknown plant ' .. token}
+    elseif token ~= 'fallow' and not pl.flags.SEED then res = {ok = false, error = token .. ' cannot be farmed (no seeds)'}
+    elseif token ~= 'fallow' and not grows_here(pl, underground(b)) then
+      res = {ok = false, error = token .. ' does not grow ' .. (underground(b) and 'underground' or 'on the surface')}
+    else
+      local targets = (season == 'all') and SEASONS or {season}
+      local set, skipped = {}, {}
+      for _, s in ipairs(targets) do
+        local idx
+        for i, n in ipairs(SEASONS) do if n == s then idx = i - 1 end end
+        if idx == nil then skipped[#skipped + 1] = s .. ' (not a season)'
+        elseif token ~= 'fallow' and not pl.flags[SFLAG[s]] then skipped[#skipped + 1] = s .. ' (does not grow then)'
+        else b.plant_id[idx] = (token == 'fallow') and -1 or pl.index; set[#set + 1] = s end
+      end
+      res = {ok = #set > 0, plot = b.id, plant = token, seasons_set = set, skipped = skipped, seeds_available = pl and (seeds[pl.id] or 0) or nil,
+        note = (pl and (seeds[pl.id] or 0) == 0) and 'no seeds in stock: nothing will be planted until seeds arrive' or nil}
+    end
+  end
 elseif cmd == 'job_types' then
   local f = (args[2] or ''):lower()
   local out = {}

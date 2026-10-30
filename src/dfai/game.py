@@ -50,6 +50,11 @@ class Game:
         pos = dfhack.lua_json("positions.lua", "list")["positions"]
         out["positions"] = {p["code"]: ([h["name"] for h in p["holders"]] or "VACANT") for p in pos}
         out["new_events"] = self.events()["events"]
+        try:
+            out["my_orders"] = [{k: o[k] for k in ("order_id", "what", "state") if k in o} | ({"done": o["done"], "total": o["total"]} if "done" in o else {})
+                                for o in self.progress(15)["orders"]]
+        except Exception as e:
+            out["my_orders_error"] = str(e)
         return out
 
     def events(self, since: int | None = None, limit: int = 30) -> dict:
@@ -117,7 +122,23 @@ class Game:
     # ---------- actions ----------
     def designate(self, csv: str, x: int, y: int, z: int, mode: str, key: str | None = None) -> dict:
         args = {"csv": csv, "anchor_x": x, "anchor_y": y, "anchor_z": z, "mode": mode}
-        return self._ledgered("designate", args, key, lambda: self._preview_apply("blueprint_apply", args))
+        def do():
+            prev = self.up.call("blueprint_apply", args)
+            pv = prev.get("preview") or {}
+            conflicts = pv.get("conflicts") or []
+            by_reason = {}
+            for c in conflicts:
+                by_reason.setdefault(c.get("reason", "?"), []).append([c.get("x"), c.get("y")])
+            summary = {"tiles_affected": pv.get("tiles_affected"), "footprint_cells": pv.get("footprint_cells"),
+                       "skipped_tiles": {r: {"count": len(t), "tiles": t[:20]} for r, t in by_reason.items()},
+                       "fog_of_war_tiles": pv.get("fog_of_war_tiles"), "out_of_bounds": pv.get("clipped_out_of_bounds")}
+            if prev.get("blocked") or "confirm_token" not in prev:
+                return "blocked", {"why": prev.get("blocked"), **summary}
+            if prev.get("would_be_noop") or not pv.get("tiles_affected"):
+                return "blocked", {"why": ["nothing would change at this anchor (every tile was skipped)"], **summary}
+            res = self.up.call("blueprint_apply", {**args, "confirm_token": prev["confirm_token"]})
+            return ("applied" if res.get("applied") else "unknown"), {**summary, "result": res.get("readback") or res}
+        return self._ledgered("designate", args, key, do)
 
     def build(self, csv: str, x: int, y: int, z: int, key: str | None = None) -> dict:
         """Place #build / #place / #zone / #dig blueprints through quickfort (dry-run first)."""
@@ -302,6 +323,40 @@ class Game:
         dest = config.CHECKPOINT_DIR / f"{_slug(label)}_{tick}"
         shutil.copytree(config.SAVE_DIR / slot, dest, dirs_exist_ok=True)
         return {"ok": True, "slot": slot, "copied_to": str(dest), "seconds": round(time.time() - t0, 1)}
+
+    def progress(self, limit: int = 30) -> dict:
+        """Follow every order this server placed: in progress (with amount left), finished, or cancelled."""
+        fort, _, _ = self._fort()
+        current = {o["id"]: o for o in dfhack.lua_json("state.lua")["orders"]}
+        cancelled = {}
+        for r in self.ledger.db.execute("SELECT params, execution_status FROM actions WHERE fort=? AND kind='cancel_order'", (fort,)):
+            if r[1] == "applied":
+                cancelled[json.loads(r[0]).get("order_id")] = True
+        out = []
+        rows = self.ledger.db.execute("SELECT key, params, result, game_tick FROM actions WHERE fort=? AND kind='order' AND "
+                                      "execution_status='applied' ORDER BY id DESC LIMIT ?", (fort, limit)).fetchall()
+        for key, params, result, tick in rows:
+            res, prm = json.loads(result or "{}"), json.loads(params)
+            for o in res.get("created_orders", []):
+                cur = current.get(o["id"])
+                if cur:
+                    state = "in_progress" if cur["left"] < cur["total"] else ("waiting" if cur.get("active") else "not_started")
+                    entry = {"state": state, "done": cur["total"] - cur["left"], "total": cur["total"], "active": cur.get("active")}
+                elif o["id"] in cancelled:
+                    entry = {"state": "cancelled"}
+                else:
+                    entry = {"state": "finished", "evidence": "one-time order no longer listed and not cancelled by this server "
+                                                              "(the game removes one-time orders when complete; a person could also have removed it)"}
+                out.append({"key": key, "order_id": o["id"], "what": prm.get("reaction") or prm.get("job"),
+                            "amount": prm.get("amount"), "placed_at_tick": tick, **entry})
+        return {"orders": out}
+
+    def farm_plots(self) -> dict:
+        return dfhack.lua_json("tools.lua", "farm_plots")
+
+    def set_crops(self, plot_id: int, season: str, plant: str, key: str | None = None) -> dict:
+        return self._ledgered("set_crops", {"plot_id": plot_id, "season": season, "plant": plant}, key,
+                              lambda: dfhack.lua_json("tools.lua", "set_crops", str(plot_id), season, plant))
 
     def settle(self, key: str, outcome: str, evidence: str, inspected: list | None = None) -> dict:
         """Record an adjudication of an unresolved receipt after inspecting the game.
