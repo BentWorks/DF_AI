@@ -4,7 +4,8 @@ from mcp.server.mcpserver import MCPServer
 from .game import Game
 
 INSTRUCTIONS = """You are playing Dwarf Fortress (fortress mode) through DFHack. The game is PAUSED between your turns;
-nothing happens until you call `advance`.
+nothing happens until you call `advance`. You play fair: you can do what a human player could do through the game,
+but not cheat (DFHack 'armok' tools are refused) or see what the fort has not discovered.
 
 A good turn: `observe` -> decide -> act (dig, build, order, appoint, labor) -> `advance` some ticks -> repeat.
 Time: 1 day = 1,200 ticks (observe shows tick_in_year and abs_tick; progress uses dates and abs ticks); 1 month = 33,600; 1 season = 100,800; 1 year = 403,200. About 100 ticks per real second.

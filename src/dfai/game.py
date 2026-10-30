@@ -77,10 +77,22 @@ class Game:
             self._save_cursor(data["cursor"])
         return {"events": evs, "cursor": data.get("cursor")}
 
+    FOG_BYPASS_ARGS = {"reveal_hidden"}
+
     def sensor(self, name: str, args: dict | None = None) -> dict:
         if name not in READ_TOOLS:
             return {"error": f"unknown sensor {name!r}", "available": sorted(READ_TOOLS)}
+        bad = sorted(k for k, v in (args or {}).items() if k in self.FOG_BYPASS_ARGS and v)
+        if bad:
+            return {"error": f"refused by fair-play policy: {bad} would reveal what the fort has not discovered"}
         return self.up.call(name, args or {})
+
+    def _armok(self) -> set:
+        """DFHack's own list of cheat tools (tag 'armok'), read live and cached."""
+        if getattr(self, "_armok_cache", None) is None:
+            out = dfhack.run("ls", "armok", "--notags")
+            self._armok_cache = {l.split()[0] for l in out.splitlines() if l.strip() and not l.startswith(" ")}
+        return self._armok_cache
 
     # ---------- time ----------
     def advance(self, ticks: int, max_wall_seconds: float | None = None) -> dict:
@@ -127,7 +139,7 @@ class Game:
             time.sleep(0.2)
         d = dfhack.lua_json("state.lua", "dismiss_popups")
         dismissed = d.get("dismissed", [])
-        kick = dfhack.lua_json("state.lua", "kick_orders")
+        kick = dfhack.lua_json("state.lua", "kick_orders") if config.ENGINE_ASSISTS else {}
         out = {}
         if closed: out["closed_screens"] = closed
         if dismissed: out["dismissed_popups"] = dismissed
@@ -258,7 +270,7 @@ class Game:
             except dfhack.DFHackError as e:
                 out = f"error: {e}"
             after = [o for o in dfhack.lua_json("state.lua")["orders"] if o["id"] not in before and matches(o)]
-            kick = dfhack.lua_json("state.lua", "kick_orders")
+            kick = dfhack.lua_json("state.lua", "kick_orders") if config.ENGINE_ASSISTS else {}
             res = {"output": out[-600:], "created_orders": after, "restarted_order_checks": kick.get("kicked")}
             if warning: res["warning"] = warning
             if after:
@@ -274,7 +286,7 @@ class Game:
         def do():
             res = dfhack.lua_json("positions.lua", "assign", position, str(unit_id), *(["replace"] if replace else []))
             if res.get("ok") and not res.get("unchanged"):
-                res["restarted_order_checks"] = dfhack.lua_json("state.lua", "kick_orders").get("kicked")
+                res["restarted_order_checks"] = dfhack.lua_json("state.lua", "kick_orders").get("kicked") if config.ENGINE_ASSISTS else False
             return ("applied" if res.get("ok") else "blocked"), res
         return self._ledgered("appoint", {"position": position, "unit_id": unit_id, "replace": replace}, key, do)
 
@@ -287,6 +299,10 @@ class Game:
 
     def dfhack_command(self, command: str, key: str | None = None) -> dict:
         parts = shlex.split(command)
+        names = parts[1:] if parts and parts[0] in ("enable", "disable") else parts[:1]
+        cheats = [n for n in names if n in self._armok()]
+        if cheats:
+            return {"error": f"refused by fair-play policy: {cheats} is a DFHack 'armok' (cheat) tool"}
         if parts and parts[0] in ("enable", "disable") and len(parts) >= 2:
             bad = [x for x in parts[1:] if x not in DFHACK_ALLOWED]
             if bad:
@@ -325,7 +341,9 @@ class Game:
                 out[cmd] = dfhack.run(*cmd.split())[-1500:]
             except dfhack.DFHackError as e:
                 out[cmd] = f"error: {e}"
-        out["dfai"] = {"advance_closes_menus": True, "advance_dismisses_popups": True, "advance_restarts_order_timer": True,
+        out["dfai"] = {"advance_closes_menus": True, "advance_dismisses_popups": True,
+                       "engine_assists": {"restart_stalled_order_timer": config.ENGINE_ASSISTS},
+                       "fair_play": {"armok_commands_refused": True, "fog_of_war_bypass_refused": True},
                        "trust_rpc_barrier": config.TRUST_RPC_BARRIER}
         return out
 

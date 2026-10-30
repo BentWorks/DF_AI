@@ -1,5 +1,7 @@
 # Play session 4: Codex recovers from a strange-mood shortage (2026-10-30)
 
+> **Policy in effect:** this ran *before* the fair-play policy (commit `dec84da`). The server's allowlist already excluded cheat commands, but there was no `armok` refusal and no fog-bypass refusal yet. The transcript shows the playing agent used neither. The order-timer restart engine assist was always on.
+
 This is the mood experiment agreed with AI Collaborator Codex. The test: can an agent detect what a strange mood demands, find that the fort lacks it, set up a supply the dwarves can reach, and get the artifact made?
 
 ## Setup
