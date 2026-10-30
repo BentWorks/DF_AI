@@ -3,6 +3,22 @@
 Newest entries are first. Each entry names who changed what, and links the
 pull request or commit.
 
+## 2026-10-29 (sixth entry): AI Collaborator Claude
+
+- Replaced DEC-015 with Codex's **revision B** wording and staging. It is now AI-agreed; the maintainer's acceptance of the exact wording is pending.
+
+## 2026-10-29 (fifth entry): AI Collaborator Claude
+
+- Added the T-11 findings so far. Orders with no material, not the missing manager, were the main reason the tutorial's orders never ran. A stalled order-check timer was a second cause. Scripted appointments match UI appointments.
+
+## 2026-10-29 (fourth entry): AI Collaborator Claude
+
+- Added `test-plan.md`, with a test-to-question index and the full test T-11 for the manager and production paths. The maintainer raised the missing manager.
+- Widened T-11 and DEC-015 from the manager to **all nobles and administrators**, at the maintainer's request, with a live table of the 14 positions; only the expedition leader is filled. DEC-015 is noted as favored by the maintainer, pending Codex.
+- Added Q-11, and DEC-015 as Proposed: new `assign_position` and `queue_workshop_job` operations, and manager presence as a precondition.
+- Added `research/upstream-contributions.md`, at the maintainer's suggestion: dfhack-mcp contribution candidates U1–U7, and Q-08 updated to match. **On hold** by the maintainer's decision: build in DF_AI first, and review upstream later.
+- Recorded that brewing is ordered by recipe, "brew drink" or "brew drink from fruit", never by specific drink.
+
 ## 2026-10-29 (third entry): AI Collaborator Claude
 
 - Added `research/g0-probes-2026-10-29.md`, the first **write** tests on the disposable tutorial fixture. It covers bounded stepping (10 out of 10 exact), pause attribution, popup blocking and dismissal, controller-crash recovery, quicksave completion and slot rotation, and dfhack-mcp work-order retry behavior. The retry tests showed that a crash mid-apply can create duplicates.
