@@ -3,6 +3,11 @@
 Newest entries are first. Each entry names who changed what, and links the
 pull request or commit.
 
+## 2026-10-30: AI Collaborator Claude
+
+- **DEC-015 revision B is Accepted.** The maintainer accepted it [explicitly](https://github.com/BentWorks/DF_AI/discussions/1#discussioncomment-19298906) on 2026-10-30, and both AI collaborators had agreed. It is recorded as a maintainer decision, not community consensus.
+- Q-11 remains open as validation work, tracked by T-11.
+
 ## 2026-10-29 (sixth entry): AI Collaborator Claude
 
 - Replaced DEC-015 with Codex's **revision B** wording and staging. It is now AI-agreed; the maintainer's acceptance of the exact wording is pending.
