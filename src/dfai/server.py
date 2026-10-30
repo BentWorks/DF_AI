@@ -270,6 +270,14 @@ def death_history() -> str:
     return _j(game().death_history())
 
 
+@mcp.tool(structured_output=False)
+@_safe
+def automation() -> str:
+    """The fort's current DFHack automation (enabled plugins and helper settings) and the server's own automatic
+    behaviours. Useful before planning, and recorded in every checkpoint manifest."""
+    return _j(game().automation())
+
+
 def main():
     mcp.run("stdio")
 

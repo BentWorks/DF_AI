@@ -26,7 +26,8 @@ class Game:
         self.up = Upstream()
         self.ledger = Ledger()
         self._cursor_file = config.RUN_DIR / "event_cursor.json"
-        self._mutex = threading.RLock()   # one mutation (and its recovery) at a time, including checkpoints
+        self._mutex = threading.RLock()
+        self._last_tick = None   # one mutation (and its recovery) at a time, including checkpoints
         self._ensure_blueprint_link()
 
     # ---------- observation ----------
@@ -84,6 +85,7 @@ class Game:
     # ---------- time ----------
     def advance(self, ticks: int, max_wall_seconds: float | None = None) -> dict:
         prep = self._clear_blockers()
+        pre_tick = dfhack.lua_json("state.lua", "identity")["abs_tick"]
         began = dfhack.lua_json("step.lua", "begin", str(int(ticks)))
         if not began.get("started"):
             return {"advanced": False, "reason": began, **prep}
@@ -103,7 +105,12 @@ class Game:
         if st.get("timer_active"):
             dfhack.lua_json("step.lua", "cancel")
         popups = dfhack.lua_json("state.lua", "popups")["popups"]
-        return {"advanced": True, "requested_ticks": ticks, "elapsed_ticks": st.get("elapsed_ticks"),
+        post_tick = dfhack.lua_json("state.lua", "identity")["abs_tick"]
+        audit = {"before_abs_tick": pre_tick, "after_abs_tick": post_tick, "span_ticks": post_tick - pre_tick}
+        if self._last_tick is not None and pre_tick != self._last_tick:
+            audit["ticks_outside_advance_since_last_call"] = pre_tick - self._last_tick
+        self._last_tick = post_tick
+        return {"advanced": True, "requested_ticks": ticks, "elapsed_ticks": st.get("elapsed_ticks"), "tick_audit": audit,
                 "stopped_because": st.get("pause_causes"), "watchdog": st.get("watchdog"),
                 "interrupting_popups": popups, "new_reports": st.get("new_reports"),
                 "date_now": dfhack.lua_json("state.lua")["date"], "wall_seconds": round(time.time() - t0, 1), **prep}
@@ -310,6 +317,18 @@ class Game:
     def buildings(self, zones: bool = False) -> dict:
         return dfhack.lua_json("tools.lua", "buildings", "zones" if zones else "all")
 
+    def automation(self) -> dict:
+        """Exact DFHack automation state, for run records: enabled plugins plus settings of the common helpers."""
+        out = {"enabled": [l.split(":")[0].strip() for l in dfhack.run("enable").splitlines() if l.rstrip().endswith(" on") or ": on " in l + " "]}
+        for cmd in ("seedwatch", "autofarm status", "autobutcher list", "autochop status", "repeat --list", "buildingplan status"):
+            try:
+                out[cmd] = dfhack.run(*cmd.split())[-1500:]
+            except dfhack.DFHackError as e:
+                out[cmd] = f"error: {e}"
+        out["dfai"] = {"advance_closes_menus": True, "advance_dismisses_popups": True, "advance_restarts_order_timer": True,
+                       "trust_rpc_barrier": config.TRUST_RPC_BARRIER}
+        return out
+
     def checkpoint(self, label: str = "checkpoint", key: str | None = None) -> dict:
         # holds the same mutex as every mutation, so no server-made save can fall between an action and its marker
         return self._ledgered("checkpoint", {"label": label}, key, lambda: self._checkpoint(label))
@@ -335,7 +354,20 @@ class Game:
         tick = dfhack.lua_json("state.lua")["tick"]
         dest = config.CHECKPOINT_DIR / f"{_slug(label)}_{tick}"
         shutil.copytree(config.SAVE_DIR / slot, dest, dirs_exist_ok=True)
-        return {"ok": True, "slot": slot, "copied_to": str(dest), "seconds": round(time.time() - t0, 1)}
+        import subprocess
+        try:
+            commit = subprocess.run(["git", "-C", str(config.PROJECT), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+            dirty = bool(subprocess.run(["git", "-C", str(config.PROJECT), "status", "--porcelain", "src"], capture_output=True, text=True).stdout.strip())
+        except Exception:
+            commit, dirty = None, None
+        ident = dfhack.lua_json("state.lua", "identity")
+        manifest = {"label": label, "slot": slot, "date": _date(ident["abs_tick"]), "abs_tick": ident["abs_tick"],
+                    "fort": f"{ident['world']}#site{ident['site_id']}", "branch": [ident["branch_token"], ident["branch_seq"]],
+                    "server_commit": commit, "server_src_dirty": dirty, "automation": self.automation(),
+                    "created": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        (dest / "dfai_manifest.json").write_text(json.dumps(manifest, indent=1))
+        return {"ok": True, "slot": slot, "copied_to": str(dest), "manifest": str(dest / "dfai_manifest.json"),
+                "seconds": round(time.time() - t0, 1)}
 
     def progress(self, limit: int = 30) -> dict:
         """Follow every order this server placed. States, by confidence:
