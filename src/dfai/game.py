@@ -159,6 +159,11 @@ class Game:
             dry = dfhack.run("quickfort", "run", f"dfai/{name}", "-c", f"{x},{y},{z}", "--dry-run")
             if "error" in dry.lower() or "fail" in dry.lower():
                 return "blocked", {"dry_run": dry}
+            import re
+            placed = [int(n) for n in re.findall(r"(?:designated|placed|planned)[^:\n]*:\s*(\d+)", dry, re.I)]
+            if not placed or sum(placed) == 0:
+                problems = [l.strip() for l in dry.splitlines() if re.search(r"unsuitable|invalid|skipped|occupied|blocked", l, re.I)]
+                return "blocked", {"why": problems or ["the dry run would place nothing at this anchor"], "dry_run": _stats(dry)}
             real = dfhack.run("quickfort", "run", f"dfai/{name}", "-c", f"{x},{y},{z}")
             return "applied", {"dry_run": _stats(dry), "result": _stats(real)}
         return self._ledgered("build", {"csv": csv, "x": x, "y": y, "z": z}, key, do)
