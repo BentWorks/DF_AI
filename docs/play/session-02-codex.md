@@ -1,5 +1,7 @@
 # Play session 2: Codex, headless (2026-10-29)
 
+> **Policy in effect:** this ran *before* the fair-play policy (commit `dec84da`). The server's allowlist already excluded cheat commands, but there was no `armok` refusal and no fog-bypass refusal yet. The transcript shows the playing agent used neither. The order-timer restart engine assist was always on.
+
 - **Client:** `codex exec` (codex-cli 0.160.0, default model), `-s read-only`, with the DF_AI server attached via `-c mcp_servers.dfai...` and `default_tools_approval_mode="approve"`.
 - **Server:** v0.2, with 18 tools.
 - **Prompt:** the same goal as session 1, picking up from the fort Claude left behind.

@@ -1,5 +1,7 @@
 # Play session 3: Claude plays to the first day of winter (2026-10-30)
 
+> **Policy in effect:** this ran *before* the fair-play policy (commit `dec84da`). The server's allowlist already excluded cheat commands, but there was no `armok` refusal and no fog-bypass refusal yet. The transcript shows the playing agent used neither. The order-timer restart engine assist was always on.
+
 ## Setup
 
 | Item | Value |

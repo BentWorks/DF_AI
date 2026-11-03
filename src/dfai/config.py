@@ -25,3 +25,10 @@ for d in (RUN_DIR, BLUEPRINT_DIR, CHECKPOINT_DIR):
 # time on the game thread (so a later call proves an earlier, possibly timed-out, command has finished). That is not
 # yet verified, so replay is OFF by default: an unchanged order-id counter is reported, but the receipt stays unknown.
 TRUST_RPC_BARRIER = os.environ.get("DFAI_TRUST_RPC_BARRIER", "0") == "1"
+
+# Fair play. The playing agent gets only what a human player could do through the game's own interface:
+#  - no DFHack command tagged "armok" (DFHack's own label for cheats), checked live, on top of the allowlist;
+#  - no fog-of-war bypass in observations (e.g. geology reveal_hidden);
+#  - "engine assists" (things a player cannot do, used only to work around engine stalls) are declared and can be
+#    switched off. Test-harness interventions (forcing moods, events) are never available through the server.
+ENGINE_ASSISTS = os.environ.get("DFAI_ENGINE_ASSISTS", "1") == "1"   # currently: restart a stalled order-check timer
